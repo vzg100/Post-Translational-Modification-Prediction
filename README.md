@@ -68,7 +68,7 @@ KNN has a success rate of:0.29411764705882354
 -Linear seems to the best classifier for SVC, I am curious as to why
 
 
-<b>Next Steps:<\b>
+<b>Next Steps:</b>
 
 -Clean up some of the classifier object code
 
