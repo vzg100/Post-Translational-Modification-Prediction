@@ -7,11 +7,10 @@ from sklearn.neighbors import KNeighborsClassifier
 
 
 class Janitor:
-    """Collects and parses potnetially interesting data.
+    """Collects and parses potentially interesting data.
     - Currently  Full AA sequence, Local Sequence, specific AA modification, Modified AA are used as Features
     - Modification AA position is the current Label
     - Uses protein Acquisition ID to download the fasta file sequence
-    -
     """
     # Data storage
     IDdict = {}
@@ -141,9 +140,9 @@ class Classifier:
         y_training = np.array(self.LabelTrain).reshape((self.splitter, 1))
         test_data_features = vec.transform(self.FeatureTest)
         test_data_features = test_data_features.toarray()
-        forest = RandomForestClassifier(n_estimators=110)
-        classy = svm.SVC()
-        neigh = KNeighborsClassifier(n_neighbors=2)
+        forest = RandomForestClassifier(n_estimators=50)
+        classy = svm.SVC(kernel="poly")
+        neigh = KNeighborsClassifier(n_neighbors=3)
         # Training
         classy.fit(x_training, y_training.ravel())
         forest.fit(x_training, y_training.ravel())
