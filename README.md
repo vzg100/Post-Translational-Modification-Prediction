@@ -6,13 +6,13 @@ Capstone project for Senior Year
 
 -Protien Sequence
 
--region sequence (+- 7 AA on either side)
+-Region sequence (+- 7 AA on either side)
 
 -Amino acid species modifier
 
 <b>Currently used labels:</b>
 
--Amino acid index (reffering to total sequence)
+-Amino acid index (referring to total sequence)
 
 <b>Currently used Classifiers:</b>
 
@@ -76,7 +76,7 @@ KNN has a success rate of:0.29411764705882354
 
 -Implement data "shuffling" for better training/testing
 
--Implement filters for specific amino acids so that their 
+-Implement filters for specific amino acids to prevent fake labels 
 
 
 
