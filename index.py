@@ -7,7 +7,8 @@ from sklearn.neighbors import KNeighborsClassifier
 
 
 class Janitor:
-    """Collects and parses potentially interesting data.
+    """
+    Collects and parses potentially interesting data.
     - Currently  Full AA sequence, Local Sequence, specific AA modification, Modified AA are used as Features
     - Modification AA position is the current Label
     - Uses protein Acquisition ID to download the fasta file sequence
@@ -179,9 +180,10 @@ class Classifier:
         else:
             print("KNN Failed all Test Cases")
 x = Classifier("temp_test.csv")
-x.split_me(.70)
+x.split_me(0.7)
 x.get_classy()
 # Short Term
 # TODO: Clean up code
 # TODO: Scrape additional data: Lociliazation, AA specificity, motiff specificity
 # TODO: Modify parameters
+# TODO: Change label to [AA, Index]
