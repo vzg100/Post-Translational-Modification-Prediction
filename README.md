@@ -25,7 +25,7 @@ KNN - 2N
 
 <b>Current Output: </b>
 
--High
+-High achieved with a split ratio of .7
 
 SVC has a success rate of:0.29411764705882354
 
