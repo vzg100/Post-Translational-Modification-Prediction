@@ -141,7 +141,7 @@ class Classifier:
         y_training = np.array(self.LabelTrain).reshape((self.splitter, 1))
         test_data_features = vec.transform(self.FeatureTest)
         test_data_features = test_data_features.toarray()
-        forest = RandomForestClassifier(n_estimators=50)
+        forest = RandomForestClassifier(n_estimators=120)
         classy = svm.SVC(kernel="poly")
         neigh = KNeighborsClassifier(n_neighbors=3)
         # Training
@@ -182,8 +182,16 @@ class Classifier:
 x = Classifier("temp_test.csv")
 x.split_me(0.7)
 x.get_classy()
+
+
+class Protien_data:
+    peptide_sequence = []
+
+
+
 # Short Term
 # TODO: Clean up code
 # TODO: Scrape additional data: Lociliazation, AA specificity, motiff specificity
 # TODO: Modify parameters
 # TODO: Change label to [AA, Index]
+# TODO: Figure out a way to make the Fasta[Index] == AA
