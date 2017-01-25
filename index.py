@@ -179,19 +179,3 @@ class Classifier:
 
         else:
             print("KNN Failed all Test Cases")
-x = Classifier("temp_test.csv")
-x.split_me(0.7)
-x.get_classy()
-
-
-class Protien_data:
-    peptide_sequence = []
-
-
-
-# Short Term
-# TODO: Clean up code
-# TODO: Scrape additional data: Lociliazation, AA specificity, motiff specificity
-# TODO: Modify parameters
-# TODO: Change label to [AA, Index]
-# TODO: Figure out a way to make the Fasta[Index] == AA
