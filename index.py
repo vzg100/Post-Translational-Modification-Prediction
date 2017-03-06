@@ -1,181 +1,150 @@
-import urllib.request
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_extraction import DictVectorizer
 import numpy as np
-from sklearn import svm
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import precision_recall_fscore_support
+import pandas as pd
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
+import random
+from random import randint
+import numpy as np
+from matplotlib import pyplot as plt
+from sklearn.metrics import roc_auc_score
+from sklearn.neural_network import MLPClassifier
 
-
-class Janitor:
-    """
-    Collects and parses potentially interesting data.
-    - Currently  Full AA sequence, Local Sequence, specific AA modification, Modified AA are used as Features
-    - Modification AA position is the current Label
-    - Uses protein Acquisition ID to download the fasta file sequence
-    """
-    # Data storage
-    IDdict = {}
-    Fastadict = {}
-    # Old Junk which will probably be removed in later iterations, used to properly access uniprot files
-    url = 'http://www.uniprot.org/uploadlists/'
-    params = {
-        # Defines format you are pulling the data from, in this case UniProtKBAC
-        'from': 'ACC',
-        # Define what to format the data as
-        'to': 'P_REFSEQ_AC',
-        # returns data format
-        'format': 'tab',
-        # queries where to pull from
-        'query': ''
-    }
-
-    contact = 'mgorelik@tulane.edu'
-
-    def __init__(self, filename):
-        # Reads the file to Dicts and written at CSV for further use
-        f = open(filename, 'r')
-        i = 0
-        for line in f:
-            splitline = line.split(',')
-            # Protein Acquisition ID : Modification Residue, site group ID, Modification Site
-            if "ACC_ID" in splitline:
-                pass
+def windower(seq, pos, w):
+    pos = int(pos)
+    w = int(w)
+    if (pos - w) < 0:
+        return seq[:w+pos]
+    if (pos + w) > len(seq):
+        return seq[pos-w:]
+    else:
+        return seq[pos-w:pos+w]
+    
+class Classy:
+    def __init__(self, data="phosphosites.csv", delimit=",", amino_acid="Y", sites="code",
+                 modification="phosphorylation", window_size=7, pos="position", training_ratio=.7,
+                 header_line=0, seq="sequence", neg_per_seq = 10, lines_to_read=90000, forest_size=110, classy="forest"):
+        self.classy = classy
+        data = pd.read_csv(data, header=header_line, delimiter=delimit, quoting=3, dtype=object)
+        self.data = data.reindex(np.random.permutation(data.index))
+        self.amino_acid = amino_acid
+        self.training_ratio = training_ratio
+        self.protiens = {}
+        self.features = []
+        self.labels = []
+        self.pos_features = []
+        self.pos_labels = []
+        self.neg_features = []
+        self.neg_labels = []
+        for i in range(lines_to_read):
+            if("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (data[seq][i] not in self.protiens.keys()):
+                self.protiens[data[seq][i]]=[data[pos][i]]
+            elif("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (data[pos][i] not in self.protiens[data[seq][i]]):
+                self.protiens[data[seq][i]].append(data[pos][i])
             else:
-                # Features
-                protien_acquisition_id = splitline[1]
-                modification_residue = splitline[4][0]
-                site_group_id = splitline[5]
-                modification_region = splitline[9].upper()
-                # Label
-                modification_region_location = int(splitline[4][1:-2])
-                self.IDdict[str(i)] = [modification_residue, site_group_id, modification_region, protien_acquisition_id, modification_region_location]
-                i += 1
+                pass
+        #neg_per_seq = len(self.protiens.keys())
+        for i in self.protiens.keys():
+            neg_pos = []
+            neg_pos_used = []
+            
+            positions = self.protiens[i]
+            for p in positions:
+                window = ProteinAnalysis(windower(i, p, window_size))
+                self.features.append([window.gravy(), window.aromaticity(), window.isoelectric_point()])
+                self.pos_features.append([window.gravy(), window.aromaticity(), window.isoelectric_point()])
+                self.labels.append(1)
+                self.pos_labels.append(1)
+            for aa in range(len(i)):
+                if (i[aa] == amino_acid) and (aa not in positions):
+                    neg_pos.append(aa)
+            counter = 0
+            while(counter < neg_per_seq) and (len(neg_pos_used) != len(neg_pos)):
+                qq = randint(0, len(neg_pos))
+                if(qq not in neg_pos_used):
+                    window = ProteinAnalysis(windower(i, qq, window_size))
+                    self.features.append([window.gravy(), window.aromaticity(), window.isoelectric_point()])
+                    self.labels.append(0)   
+                    self.neg_labels.append(0)
+                    self.neg_features.append([window.gravy(), window.aromaticity(), window.isoelectric_point()])
+                    neg_pos_used.append(qq)
+                    counter += 1
 
-    def fasta_collect(self):
-        # Scarpes the fasta files from uniprot according to their Acquisition ID's
-        print(self.IDdict)
-        for i in self.IDdict.keys():
-            page = urllib.request.urlopen("http://www.uniprot.org/uniprot/"+self.IDdict[i][3]+".fasta")
-            sequence = str(page.read())
-            t = 0
-            for j in sequence:
-                if j == "\\":
-                    break
-                t += 1
-            sequence = sequence[t:]
-            temp = ''
-            for i2 in sequence:
-                if i2 not in "\\n'":
-                    temp += i2
-            sequence = temp
-            self.Fastadict[i] = sequence
-        print(self.Fastadict)
-
-    def write_to_csv(self, filename):
-        # Writes all the stored data to a CSV for the Classifier class to read,
-        # late I should have the classifeir class simply take a Janitor object
-        f = open(filename, 'w')
-        f.write("modification_residue,site_group_id,modification_region,protien_acquisition_id,"
-                "fasta_seq,modification_region_location\n")
-        for i in self.IDdict.keys():
-            f.write(str(self.IDdict[i][0])+","+str(self.IDdict[i][1])+","+str(self.IDdict[i][2])+","+str(self.IDdict[i][3])+","+self.Fastadict[i]+","+str(self.IDdict[i][-1])+"\n")
-        print("Done Writing")
-
-
-class Classifier:
-    """Runs the data through a series of classifiers, currently needs a lot of tweaking"""
-    # Label
-    modification_region_location = []
-    # Features
-    modification_residue = []
-    modification_region = []
-    fasta_seq = []
-    # Dics
-    IDdict = {}
-    # ToDo: Clean this up
-    Features = []
-    Labels = []
-    features_training = []
-    FeatureTest = []
-    LabelTrain = []
-    LableTest = []
-    splitter = 0
-
-    def __init__(self, filename):
-        # Reads the data from the file to the a bunch of gunk which needs to be cleaned up
-        f = open(filename, 'r')
-        for line in f:
-            splitline = line.split(',')
-            self.modification_region_location.append(splitline[5].replace('\n', ""))
-            self.modification_residue.append(splitline[0])
-            self.modification_region.append(splitline[2])
-            self.fasta_seq.append(splitline[4])
-        self.modification_region_location = self.modification_region_location[1:]
-        self.modification_residue = self.modification_residue[1:]
-        self.modification_region = self.modification_region[1:]
-        self.fasta_seq = self.fasta_seq[1:]
-        for i in range(len(self.modification_region)):
-            self.IDdict[i] = [self.modification_region[i], self.modification_residue[i], self.fasta_seq[i]]
-        for i in range(len(self.modification_region_location)):
-            self.modification_region_location[i] = int(self.modification_region_location[i])
-
-        for i in range(len(self.modification_region)):
-            self.Features.append({"fasta_seq": self.fasta_seq[i],
-                                         "modification_residue": self.modification_residue[i],
-                                         "modification_region": self.modification_region[i]})
-        self.Labels = self.modification_region_location
-
-    def split_me(self, splitratio):
-        # Splits the features & labels into training and testing
-        self.splitter = int(len(self.Features) * splitratio)
-        self.features_training = self.Features[0:self.splitter]
-        self.LabelTrain = self.Labels[0:self.splitter]
-        self.FeatureTest = self.Features[self.splitter:-1]
-        self.LableTest = self.Labels[self.splitter: -1]
-
-    def get_classy(self):
-        # Runs features and labels through multiple classifiers
-        vec = DictVectorizer()
-        x_training = vec.fit_transform(self.features_training)
-        x_training = x_training.toarray()
-        y_training = np.array(self.LabelTrain).reshape((self.splitter, 1))
-        test_data_features = vec.transform(self.FeatureTest)
-        test_data_features = test_data_features.toarray()
-        forest = RandomForestClassifier(n_estimators=120)
-        classy = svm.SVC(kernel="poly")
-        neigh = KNeighborsClassifier(n_neighbors=3)
-        # Training
-        classy.fit(x_training, y_training.ravel())
-        forest.fit(x_training, y_training.ravel())
-        neigh.fit(x_training, y_training.ravel())
-        # Testing
-        classy_predict = classy.predict(test_data_features)
-        forest_predict = forest.predict(test_data_features)
-        neigh_predict = neigh.predict(test_data_features)
-        s = 0
-        f = 0
-        n = 0
-        for i in range(len(self.LableTest)):
-
-            if classy_predict[i] == self.LableTest[i]:
-                s += 1
-            if forest_predict[i] == self.LableTest[i]:
-                f += 1
-            if neigh_predict[i] == self.LableTest[i]:
-                n += 1
-        if s != 0:
-            s = s/len(self.LableTest)
-            print("SVC has a success rate of:"+ str(s))
+        temp = list(zip(self.features, self.labels))
+        random.shuffle(temp)
+        self.features, self.labels = zip(*temp) 
+    def calculate(self):
+        self.training_slice = int(self.training_ratio*len(self.labels))
+        if self.classy == "forest":
+            
+            self.forest = RandomForestClassifier(verbose = 0, n_jobs = 4)
+            self.forest = self.forest.fit(self.features[0:self.training_slice], self.labels[0:self.training_slice])
+            self.results = self.forest.predict(self.features[self.training_slice:])
+            self.rating = precision_recall_fscore_support(self.labels[self.training_slice:], self.results, average="macro")
+        if self.classy == "mlp":
+            self.clf = MLPClassifier(solver='adam', random_state=1)
+            self.clf.fit(self.features[0:self.training_slice], self.labels[0:self.training_slice])
+            self.results = self.clf.predict(self.features[self.training_slice:])
+            self.rating = precision_recall_fscore_support(self.labels[self.training_slice:], self.results, average="macro")
+    
+    def report(self):
+        tp = 0
+        tn = 0
+        fp = 0
+        fn = 0
+        print("Report for Amino Acid: "+self.amino_acid)
+        for i in range(len(self.results)):
+            if self.results[i] == 1 and self.labels[i+self.training_slice] == 1:
+                tp+=1
+            elif self.results[i] == 0 and self.labels[i+self.training_slice] == 0:
+                tn +=1 
+            elif self.results[i] == 1 and self.labels[i+self.training_slice] == 0:
+                fp +=1
+            else:
+                fn+=1
+        if tp != 0:
+            self.prec = tp/(tp+fp) # sensitivity 
+            self.recall = tp/(tp+fn)
+            self.acc = (tp+tn)/(tp+fp+tn+fn)
+            print(self.prec, self.recall, self.acc)
+            self.roc = roc_auc_score(self.labels[self.training_slice:], self.results)
+            print(self.roc)
+            return([self.roc, self.prec, self.recall, self.acc])
         else:
-            print("SVC Failed all Test Cases")
-        if f != 0:
-            f = f/len(self.LableTest)
-            print("Random Forest has a success rate of:" + str(f))
-        else:
-            print("Random Forest Failed all Test Cases")
-        if n != 0:
-            n = n/len(self.LableTest)
-            print("KNN has a success rate of:" + str(n))
-
-        else:
-            print("KNN Failed all Test Cases")
+            print("Failed")
+            return False
+        #count positives vs negatives and where they pop up, look for feedback places online 
+        #take run of the mill problem and compare to accruacy 
+        #check cbs paper 
+    def save_to_csv(self, filname):
+        f = open(filename, "w")
+        f.write(self.amino_acid+","+self.prec+","+self.recall+","+self.acc+"\n")
+    def speak_to_the_trees(self):
+        feat_imp = self.forest.feature_importances_
+        print(feat_imp)
+        return(feat_imp)
+    def vote(self, voters, pos_used, neg_ratio):
+        #voters is how many classifiers will be createt
+        #pos_used % of positive examples used to train, must be less than .95
+        #neg_ratio % of each classifiers training will be negative examples 
+        
+        #TODO: Randomly shuffle negative & positive trianing sets
+        length_voter = int(pos_used*len(self.pos_features))/(1-neg_ratio)
+        
+        partition_count = 
+        neg_combos = [self.neg_features[i:i+partition_count] for i in range(0, len(self.neg_features), partition_count)]
+        vote_training_features = []
+        vote_training_labels = []
+        vote_test_features = []
+        vote_test_labels = []
+        for i in range(len(neg_combos)-1):
+for i in "SYTK":
+    x = Classy(amino_acid=i, forest_size=110, classy="mlp")
+    x.calculate()
+    x.report()
+    y = Classy(amino_acid=i, forest_size=110, classy="forest")
+    y.vote(5)
+    y.calculate()
+    y.report()
