@@ -3,7 +3,6 @@
   <component name="ChangeListManager">
     <list default="true" id="9b05ecc2-3ec7-44b5-b90f-991c7b7c93e4" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/index.py" afterPath="$PROJECT_DIR$/index.py" />
     </list>
     <ignored path="ProtienFolding.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -381,7 +380,14 @@
       <option name="project" value="LOCAL" />
       <updated>1491010914139</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="added mixed training and additional features">
+      <created>1491098331930</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1491098331931</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TodoView">
@@ -432,7 +438,8 @@
     <MESSAGE value="tinkering" />
     <MESSAGE value="updates" />
     <MESSAGE value="added random training" />
-    <option name="LAST_COMMIT_MESSAGE" value="added random training" />
+    <MESSAGE value="added mixed training and additional features" />
+    <option name="LAST_COMMIT_MESSAGE" value="added mixed training and additional features" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
