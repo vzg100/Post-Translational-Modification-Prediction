@@ -21,6 +21,17 @@ def windower(sequence, position, wing_size):
     else:
         return sequence[position - wing_size:position + wing_size]
 
+def featurify(temp_window):
+    # assumes temp_window = ProteinAnalysis(seq)
+    q = [temp_window.gravy(),temp_window.aromaticity(), temp_window.isoelectric_point(),temp_window.instability_index(),
+     temp_window.secondary_structure_fraction()[0],temp_window.secondary_structure_fraction()[1],temp_window.secondary_structure_fraction()[2]]
+    z = temp_window.amino_acids_content
+
+    for i in "GALMFWKQESPVICYHRGNDT":
+        q.append(z[i])
+    q = q
+
+    return q
 
 def random_seq(locked, wing_size, center):
     amino_acids = "GALMFWKQESPVICYHRGNDT"
@@ -77,7 +88,7 @@ def report(results, answers, shift=0):
 class Classy:
     def __init__(self, data="phosphosites.csv", delimit=",", amino_acid="Y", sites="code",
                  modification="phosphorylation", window_size=7, pos="position", training_ratio=.7,
-                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=90000, forest_size=110, classy="forest",):
+                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=90000, forest_size=110, classy="forest"):
 
         self.classy = classy
         data = pd.read_csv(data, header=header_line, delimiter=delimit, quoting=3, dtype=object)
@@ -109,11 +120,7 @@ class Classy:
                 # Calculated positive features
                 temp_window = ProteinAnalysis(windower(i, position, self.window))
                 self.pos_seq.append(windower(i, position, self.window))
-                feat = [temp_window.gravy(),
-                        temp_window.aromaticity(), temp_window.isoelectric_point(),
-                        temp_window.instability_index(),
-                        temp_window.secondary_structure_fraction()[0], temp_window.secondary_structure_fraction()[1],
-                        temp_window.secondary_structure_fraction()[2]]
+                feat = featurify(temp_window)
                 self.features.append(feat)
                 self.labels.append(1)
                 self.pos_seq.append(windower(i, position, self.window))
@@ -128,12 +135,7 @@ class Classy:
                 if temp_negative not in neg_sites_used:
                     temp_window = ProteinAnalysis(windower(i, temp_negative, self.window))
                     counter += 1
-                    feat = [temp_window.gravy(),
-                                temp_window.aromaticity(), temp_window.isoelectric_point(),
-                                temp_window.instability_index(),
-                                temp_window.secondary_structure_fraction()[0],
-                                temp_window.secondary_structure_fraction()[1],
-                                temp_window.secondary_structure_fraction()[2]]
+                    feat = featurify(temp_window)
                     self.features.append(feat)
                     self.labels.append(0)
                     self.neg_count +=1
@@ -152,27 +154,36 @@ class Classy:
         for i in random_negative_seq:
             self.labels.append(0)
             temp_window = ProteinAnalysis(i)
-            feat = [temp_window.gravy(),
-                    temp_window.aromaticity(), temp_window.isoelectric_point(),
-                    temp_window.instability_index(),
-                    temp_window.secondary_structure_fraction()[0],
-                    temp_window.secondary_structure_fraction()[1],
-                    temp_window.secondary_structure_fraction()[2]]
+            feat = featurify(temp_window)
             self.features.append(feat)
         for i in self.pos_seq:
             self.labels.append(1)
             temp_window = ProteinAnalysis(i)
-            feat = [temp_window.gravy(),
-                    temp_window.aromaticity(), temp_window.isoelectric_point(),
-                    temp_window.instability_index(),
-                    temp_window.secondary_structure_fraction()[0],
-                    temp_window.secondary_structure_fraction()[1],
-                    temp_window.secondary_structure_fraction()[2]]
+            feat = featurify(temp_window)
             self.features.append(feat)
 
         temp = list(zip(self.features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
+
+    def mixed_training(self):
+        random_negative_seq = []
+        self.labels = list(self.labels)
+        self.features = list(self.features)
+        for i in range(self.neg_count):
+            random_negative_seq.append(random_seq(self.pos_seq, self.window, self.amino_acid))
+        for i in random_negative_seq:
+
+            self.labels.append(0)
+            temp_window = ProteinAnalysis(i)
+            feat = featurify(temp_window)
+            self.features.append(feat)
+
+        temp = list(zip(self.features, self.labels))
+        random.shuffle(temp)
+        self.features, self.labels = zip(*temp)
+
+
 
     def calculate(self):
         self.training_slice = int(self.training_ratio * len(self.labels))
@@ -206,24 +217,14 @@ class Classy:
             for i in f:
                 if ">" not in i and i[sequence_position] == self.amino_acid:
                     temp_window = ProteinAnalysis(windower(i, sequence_position, self.window).strip("\t"))
-                    feat = [temp_window.gravy(),
-                            temp_window.aromaticity(), temp_window.isoelectric_point(),
-                            temp_window.instability_index(),
-                            temp_window.secondary_structure_fraction()[0],
-                            temp_window.secondary_structure_fraction()[1],
-                            temp_window.secondary_structure_fraction()[2]]
+                    feat = featurify(temp_window)
                     test_features.append(feat)
                     test_labels.append(1)
         with open(negative_file) as f:
             for i in f:
                 if ">" not in i and i[sequence_position] == self.amino_acid:
                     temp_window = ProteinAnalysis(windower(i, sequence_position, self.window).strip("\t"))
-                    feat = [temp_window.gravy(),
-                            temp_window.aromaticity(), temp_window.isoelectric_point(),
-                            temp_window.instability_index(),
-                            temp_window.secondary_structure_fraction()[0],
-                            temp_window.secondary_structure_fraction()[1],
-                            temp_window.secondary_structure_fraction()[2]]
+                    feat = featurify(temp_window)
                     test_features.append(feat)
                     test_labels.append(0)
         temp = list(zip(test_features, test_labels))
@@ -235,21 +236,20 @@ class Classy:
 
 
 
+
+
 for site in "S":
-    for classy in ["mlp", "forest", "l_svc", "svc"]:
+    for classy in ["mlp", "forest", "svc"]:
         for ratio in [1, 3, 5, 9]:
             for window_s in [1, 3, 7]:
                 print("Random Training Results")
                 x = Classy(amino_acid=site, forest_size=110, classy=classy, window_size=window_s, neg_per_seq=ratio)
-                x.random_training()
+                x.mixed_training()
                 x.calculate()
                 x.report()
-
                 x.test("PKC_pos.fasta", "PKC_neg.fasta")
-                print("\n")
-                print("Non Random Training Results")
-                y=Classy(amino_acid=site, forest_size=110, classy=classy, window_size=window_s, neg_per_seq=ratio)
-                y.calculate()
-                y.report()
-                y.test("PKC_pos.fasta", "PKC_neg.fasta")
-                print("\n\n\n")
+
+                #random plus non random data + class imbalnce for training, implement consensus sequence as a feature
+                #try making 2/3 data random?
+                #try making 1/3 data random
+                #try different mlp parameters and random forest weighing
