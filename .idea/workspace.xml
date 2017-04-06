@@ -26,8 +26,8 @@
       <file leaf-file-name="index.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/index.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-2584">
-              <caret line="26" column="121" lean-forward="true" selection-start-line="26" selection-start-column="121" selection-end-line="26" selection-end-column="121" />
+            <state relative-caret-position="356">
+              <caret line="239" column="52" lean-forward="false" selection-start-line="239" selection-start-column="52" selection-end-line="239" selection-end-column="52" />
               <folding>
                 <element signature="e#0#51#0" expanded="true" />
               </folding>
@@ -50,6 +50,8 @@
       <find>neg_pe</find>
       <find>count</find>
       <find>feat</find>
+      <find>classy</find>
+      <find>report</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -395,7 +397,14 @@
       <option name="project" value="LOCAL" />
       <updated>1491098345711</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Restructured the code for easier modification and automated testing">
+      <created>1491320620345</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1491320620345</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TodoView">
@@ -447,7 +456,8 @@
     <MESSAGE value="updates" />
     <MESSAGE value="added random training" />
     <MESSAGE value="added mixed training and additional features" />
-    <option name="LAST_COMMIT_MESSAGE" value="added mixed training and additional features" />
+    <MESSAGE value="Restructured the code for easier modification and automated testing" />
+    <option name="LAST_COMMIT_MESSAGE" value="Restructured the code for easier modification and automated testing" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -822,8 +832,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/index.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2584">
-          <caret line="26" column="121" lean-forward="true" selection-start-line="26" selection-start-column="121" selection-end-line="26" selection-end-column="121" />
+        <state relative-caret-position="356">
+          <caret line="239" column="52" lean-forward="false" selection-start-line="239" selection-start-column="52" selection-end-line="239" selection-end-column="52" />
           <folding>
             <element signature="e#0#51#0" expanded="true" />
           </folding>

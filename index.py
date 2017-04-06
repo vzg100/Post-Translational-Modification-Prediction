@@ -8,6 +8,13 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 from sklearn.neural_network import MLPClassifier
 from sklearn import svm
+from sklearn import model_selection
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import BaggingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import VotingClassifier
 
 
 def windower(sequence, position, wing_size):
@@ -24,9 +31,9 @@ def windower(sequence, position, wing_size):
 
 def featurify(temp_window):
     # assumes temp_window = ProteinAnalysis(seq)
-    q = [temp_window.gravy(),temp_window.aromaticity(), temp_window.isoelectric_point(),temp_window.instability_index(), 
-        temp_window.secondary_structure_fraction()[0],temp_window.secondary_structure_fraction()[1],
-        temp_window.secondary_structure_fraction()[2]]
+    q = [temp_window.gravy(),temp_window.aromaticity(), temp_window.isoelectric_point(),temp_window.instability_index(),
+         temp_window.secondary_structure_fraction()[0],temp_window.secondary_structure_fraction()[1],
+         temp_window.secondary_structure_fraction()[2]]
     z = temp_window.amino_acids_content
 
     for i in "GALMFWKQESPVICYHRGNDT":
@@ -34,6 +41,7 @@ def featurify(temp_window):
     q = q
 
     return q
+
 
 def random_seq(locked, wing_size, center):
     amino_acids = "GALMFWKQESPVICYHRGNDT"
@@ -60,12 +68,12 @@ def report(results, answers, shift=0):
         else:
             fn += 1
     if tp != 0:
-        tpr = tp / (tp + fn)  #aka recall aka true positive rate
-        spc =tn / (tn+fp)  #specificty or true negative rate
+        tpr = tp / (tp + fn)  # aka recall aka true positive rate
+        spc = tn / (tn+fp)  # specificty or true negative rate
         ppv = tp / (tp + fp)  # positive predicative value aka precision
-        npv = tn/(tn+fn)  #negative predictive value
+        npv = tn/(tn+fn)  # negative predictive value
         fpr = fp/(fp+tn)  # false positive rate aka fallout
-        fnr = fn/(tp+fn)  #false negative rate
+        fnr = fn/(tp+fn)  # false negative rate
         fdr = fp/(tp+fp)  # false discovery rate
         acc = (tp + tn) / (tp + fp + tn + fn)
         #roc = roc_auc_score(answers, results[shift:])
@@ -86,11 +94,12 @@ def report(results, answers, shift=0):
         print("Failed")
         return False
 
+
 class Classy:
 
     def __init__(self, data="phosphosites.csv", delimit=",", amino_acid="Y", sites="code",
                  modification="phosphorylation", window_size=7, pos="position", training_ratio=.7,
-                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=90000, forest_size=110, classy="forest"):
+                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=90000, classy="forest"):
         self.classy = classy
         data = pd.read_csv(data, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.data = data.reindex(np.random.permutation(data.index))
@@ -101,10 +110,10 @@ class Classy:
         self.neg_per_seq = neg_per_seq
         self.window = int(window_size)
         self.features= []
-        self.labels= []
-        self.pos_features= []
-        self.neg_features= []
-        self.pos_seq= []
+        self.labels = []
+        self.pos_features = []
+        self.neg_features = []
+        self.pos_seq = []
 
         for i in range(lines_to_read):
             if ("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (data[seq][i] not in self.proteins.keys()):
@@ -168,24 +177,29 @@ class Classy:
                            "mlp_adam": MLPClassifier(solver='adam', random_state=1),
                            "svc": svm.SVC(), "l_svc": svm.LinearSVC(),
                            "mlp_sgd": MLPClassifier(solver='sgd', random_state=1),
-                           "mlp_lbfgs": MLPClassifier(solver='lbfgs', random_state=1)
+                           "mlp_lbfgs": MLPClassifier(solver='lbfgs', random_state=1),
+                            "bag":BaggingClassifier(),
+                            "ada":AdaBoostClassifier(),
+                            "sgd":GradientBoostingClassifier(),
+
                            }
-        self.clf = classif[self.classy]
+        #do a if statement type check
+        t_class = []
+        if type(self.classy) != list:
+            self.clf = classif[self.classy]
+        else:
+            for i in self.classy:
+                t_class.append((i, classif[i]))
+            self.clf = VotingClassifier(estimators=t_class)
         self.clf.fit(self.training_features, self.training_labels)
         self.results = self.clf.predict(self.test_features)
         self.rating = precision_recall_fscore_support(self.test_labels, self.results,average="macro")
+        report(answers=self.test_labels, results=self.results)
     def speak_to_the_trees(self):
         feat_imp = self.clf.feature_importances_
         print(feat_imp)
         return feat_imp
 
-    def report(self):
-        print("Report for this run\n" +
-          "Amino Acid: " + self.amino_acid + "\n" +
-          " Classy: " + self.classy + "\n" +
-          " Pos-Neg: " + str(self.neg_per_seq) + "\n" +
-          " window_size: " + str(self.window) + "\n")
-        report(answers=self.test_labels, results = self.results)
 
     def test(self, positive_file, negative_file, sequence_position=10):
         # for my test files sequence position = 10
@@ -210,15 +224,18 @@ class Classy:
         test_features, test_labels = zip(*temp)
         test_results = self.clf.predict(test_features)
         report(test_results, test_labels)
-
-for site in "SYTK":
-    for classy in ["mlp_adam", "svc", "forest"]:
-        for ratio in [1, 3, 5, 9]:
-            for window_s in [1,2,3,5,7]:
-                for rand_r in [.3333,.5,1,2,3]:
-                    x = Classy(amino_acid=site, forest_size=110, classy=classy, window_size=window_s, neg_per_seq=ratio)
+test1 =  ["mlp_adam", "svc", "forest"] #mlp_adam is best
+test2 = ["bag", "ada", "sgd"] #sgd is best
+bestplz = ["sgd", "svc", "mlp_adam"]
+test3 = [test1, test2, bestplz]
+for site in "S":
+    for classy in test3:
+        for ratio in [3, 5, 9]:
+            for window_s in [1,3,7]:
+                for rand_r in [.5,1,3]:
+                    x = Classy(amino_acid=site, classy=classy, window_size=window_s, neg_per_seq=ratio)
                     x.generate_data(random_ratio=rand_r)
                     x.calculate()
-                    x.report()
-                    print("rand_r: "+str(rand_r))
+                    print("amino acid: " +site+ " Classy" +str(classy)+ " ratio: " +str(ratio)+ " window_s: " +str(window_s)
+                          + " rand_r: "+str(rand_r))
                     x.test(positive_file="pos.fasta", negative_file="PKA_neg.fasta")
