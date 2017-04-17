@@ -5,16 +5,26 @@ from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import random
 from random import randint
 import numpy as np
-from sklearn.metrics import roc_auc_score
 from sklearn.neural_network import MLPClassifier
 from sklearn import svm
-from sklearn import model_selection
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.ensemble import BaggingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import VotingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import PassiveAggressiveClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.metrics import roc_auc_score
+from imblearn.ensemble import EasyEnsemble
+from sklearn.model_selection import cross_val_score
+from imblearn.combine import SMOTEENN
+from imblearn.over_sampling import  ADASYN
+from imblearn.under_sampling import RandomUnderSampler
+from sklearn.ensemble import GradientBoostingClassifier
+print("I am running")
 
 
 def windower(sequence, position, wing_size):
@@ -29,26 +39,39 @@ def windower(sequence, position, wing_size):
         return sequence[position - wing_size:position + wing_size]
 
 
-def featurify(temp_window):
+def featurify(temp_window, size):
     # assumes temp_window = ProteinAnalysis(seq)
     q = [temp_window.gravy(),temp_window.aromaticity(), temp_window.isoelectric_point(),temp_window.instability_index(),
          temp_window.secondary_structure_fraction()[0],temp_window.secondary_structure_fraction()[1],
          temp_window.secondary_structure_fraction()[2]]
     z = temp_window.amino_acids_content
+    order = {}
+    counter = 0
+    aa = "GALMFWKQESPVICYHRNDT"
 
-    for i in "GALMFWKQESPVICYHRGNDT":
-        q.append(z[i])
-    q = q
+
+    for i in range(len(aa)):
+        order[aa[i]] = i
+        counter +=1
+    if len(temp_window.sequence) == size:
+        for i in temp_window.sequence:
+            q.append(order[i])
+    else:
+        for i in temp_window.sequence:
+            q.append(order[i])
+        for i in range(size - len(temp_window.sequence)):
+            q.append(-1)
 
     return q
 
 
+
 def random_seq(locked, wing_size, center):
-    amino_acids = "GALMFWKQESPVICYHRGNDT"
+    amino_acids = "GALMFWKQESPVICYHRNDT"
     t1, t2 = "", ""
     for i in range(wing_size):
-        t1 += amino_acids[randint(0, 20)]
-        t2 += amino_acids[randint(0, 20)]
+        t1 += amino_acids[randint(0, 19)]
+        t2 += amino_acids[randint(0, 19)]
     final_seq = t1 + center + t2
     if final_seq not in locked:
         return final_seq
@@ -56,7 +79,7 @@ def random_seq(locked, wing_size, center):
         random_seq(locked, wing_size, center)
 
 
-def report(results, answers, shift=0):
+def report(results, answers, classy,shift=0):
     tp, fp, fn, tn = 0, 0, 0, 0
     for i in range(len(results)):
         if results[i] == 1 and answers[i+shift] == 1:
@@ -67,7 +90,7 @@ def report(results, answers, shift=0):
             fp += 1
         else:
             fn += 1
-    if tp != 0:
+    if tp != 0 and tn != 0:
         tpr = tp / (tp + fn)  # aka recall aka true positive rate
         spc = tn / (tn+fp)  # specificty or true negative rate
         ppv = tp / (tp + fp)  # positive predicative value aka precision
@@ -76,9 +99,11 @@ def report(results, answers, shift=0):
         fnr = fn/(tp+fn)  # false negative rate
         fdr = fp/(tp+fp)  # false discovery rate
         acc = (tp + tn) / (tp + fp + tn + fn)
-        #roc = roc_auc_score(answers, results[shift:])
+        roc = roc_auc_score(answers, results)
         inf = (tpr+spc)-1
         mkd = (ppv+npv)-1
+
+
         print("Sensitivity:"+str(tpr))
         print("Specificity :" + str(spc))
         print("Positive Predictive Value:" + str(ppv))
@@ -87,8 +112,9 @@ def report(results, answers, shift=0):
         print("False Negative Rate:" + str(fnr))
         print("False Discovery Rate:" + str(fdr))
         print("Accuracy:" + str(acc))
-        #print("ROC:" + str(roc))
-        print("")
+        print("ROC:" + str(roc))
+
+        print("\n\n")
         return [tpr, spc, ppv, npv, fpr, fnr, fdr, acc, inf, mkd]
     else:
         print("Failed")
@@ -99,7 +125,7 @@ class Classy:
 
     def __init__(self, data="phosphosites.csv", delimit=",", amino_acid="Y", sites="code",
                  modification="phosphorylation", window_size=7, pos="position", training_ratio=.7,
-                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=90000, classy="forest"):
+                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=10000, classy="forest"):
         self.classy = classy
         data = pd.read_csv(data, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.data = data.reindex(np.random.permutation(data.index))
@@ -115,19 +141,43 @@ class Classy:
         self.neg_features = []
         self.pos_seq = []
 
-        for i in range(lines_to_read):
+        self.classif = {"forest": RandomForestClassifier(verbose=0, n_jobs=4),
+                           "mlp_adam": MLPClassifier(solver='adam', random_state=1, activation="logistic"),
+                           "svc": svm.SVC(), "l_svc": svm.LinearSVC(),
+                        "p_svc":svm.SVC(kernel="poly"),"r_svc":svm.SVC(kernel="rbf"),
+                           "mlp_sgd": MLPClassifier(solver='sgd', random_state=1),
+                           "mlp_lbfgs": MLPClassifier(solver='lbfgs', random_state=1),
+                            "bag":BaggingClassifier(),
+                            "ada":AdaBoostClassifier(svm.SVC(), algorithm="SAMME", n_estimators=200),
+                            "sgd":GradientBoostingClassifier(),
+                            "knn":KNeighborsClassifier(n_neighbors=1),
+                            "passive_aggro": PassiveAggressiveClassifier(),"extra": ExtraTreesClassifier(),
+                   "desc_tree": DecisionTreeClassifier(),
+                    "nb":GaussianNB(),
+                   "bnb":BernoulliNB(),
+                        "nu_svc":svm.NuSVC(), "svr":svm.SVR(),"one_svm":svm.OneClassSVM(), "gb":GradientBoostingClassifier()
+
+
+                           }
+        counter = 0
+        for i in range(len(data)):
             if ("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (data[seq][i] not in self.proteins.keys()):
                 self.proteins[data[seq][i]] = [data[pos][i]]
             elif ("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (
                 data[pos][i] not in self.proteins[data[seq][i]]):
                 self.proteins[data[seq][i]].append(data[pos][i])
+            # print(counter)
+            counter += 1
 
         for i in self.proteins.keys():
             neg_sites = []
             for position in self.proteins[i]:
-                temp_window = ProteinAnalysis(windower(i, position, self.window))
-                self.pos_seq.append(windower(i, position, self.window))
-                self.pos_features.append(featurify(temp_window))
+                try:
+                    temp_window = ProteinAnalysis(windower(i, position, self.window))
+                    self.pos_seq.append(windower(i, position, self.window))
+                    self.pos_features.append(featurify(temp_window, (2*self.window+1)))
+                except:
+                    pass
             for amino_acid_sites in range(len(i)):
                 # creates list of potential negative sites from the current sequence
                 if i[amino_acid_sites] == self.amino_acid and amino_acid_sites not in self.proteins[i]:
@@ -137,10 +187,13 @@ class Classy:
             while (counter < self.neg_per_seq) and (len(neg_sites_used) != len(neg_sites)):
                 temp_negative = randint(0, len(neg_sites))
                 if temp_negative not in neg_sites_used:
-                    temp_window = ProteinAnalysis(windower(i, temp_negative, self.window))
-                    counter += 1
-                    self.neg_features.append(featurify(temp_window))
-                    self.neg_count +=1
+                    try:
+                        temp_window = ProteinAnalysis(windower(i, temp_negative, self.window))
+                        counter += 1
+                        self.neg_features.append(featurify(temp_window, (2*self.window+1)))
+                        self.neg_count +=1
+                    except:
+                        pass
 
     def generate_data(self, random_=1, random_ratio=2, random_test=0):
         rand_features = []
@@ -148,7 +201,7 @@ class Classy:
         pos_labels = [1 for i in range(len(self.pos_features))]
         if random_ == 1 and random_ratio > 0:
             for i in range(int((len(self.pos_features)+len(self.neg_features))*random_ratio)):
-                rand_features.append(featurify(ProteinAnalysis(random_seq(locked=self.pos_seq, wing_size=self.window, center=self.amino_acid))))
+                rand_features.append(featurify(ProteinAnalysis(random_seq(locked=self.pos_seq, wing_size=self.window, center=self.amino_acid)), (2*self.window+1)))
         if random_test == 0:
             features = self.pos_features+self.neg_features
             labels = pos_labels+neg_labels
@@ -173,33 +226,19 @@ class Classy:
             self.test_labels = labels[training_slice:]
 
     def calculate(self):
-        classif = {"forest": RandomForestClassifier(verbose=0, n_jobs=4),
-                           "mlp_adam": MLPClassifier(solver='adam', random_state=1),
-                           "svc": svm.SVC(), "l_svc": svm.LinearSVC(),
-                           "mlp_sgd": MLPClassifier(solver='sgd', random_state=1),
-                           "mlp_lbfgs": MLPClassifier(solver='lbfgs', random_state=1),
-                            "bag":BaggingClassifier(),
-                            "ada":AdaBoostClassifier(),
-                            "sgd":GradientBoostingClassifier(),
-
-                           }
         #do a if statement type check
         t_class = []
         if type(self.classy) != list:
-            self.clf = classif[self.classy]
+            self.clf = self.classif[self.classy]
         else:
             for i in self.classy:
-                t_class.append((i, classif[i]))
+                t_class.append((i, self.classif[i]))
             self.clf = VotingClassifier(estimators=t_class)
         self.clf.fit(self.training_features, self.training_labels)
         self.results = self.clf.predict(self.test_features)
-        self.rating = precision_recall_fscore_support(self.test_labels, self.results,average="macro")
-        report(answers=self.test_labels, results=self.results)
-    def speak_to_the_trees(self):
-        feat_imp = self.clf.feature_importances_
-        print(feat_imp)
-        return feat_imp
-
+        #self.rating = precision_recall_fscore_support(self.test_labels, self.results,average="macro")
+        #print("cross val" + str(cross_val_score(self.clf, self.test_features, self.test_labels, cv=5)))
+        report(answers=self.test_labels, results=self.results, classy=self.clf)
 
     def test(self, positive_file, negative_file, sequence_position=10):
         # for my test files sequence position = 10
@@ -209,33 +248,67 @@ class Classy:
             for i in f:
                 if ">" not in i and i[sequence_position] == self.amino_acid:
                     temp_window = ProteinAnalysis(windower(i, sequence_position, self.window).strip("\t"))
-                    feat = featurify(temp_window)
+                    feat = featurify(temp_window, (2*self.window+1))
                     test_features.append(feat)
                     test_labels.append(1)
         with open(negative_file) as f:
             for i in f:
-                if ">" not in i and i[sequence_position] == self.amino_acid:
+
+                if ">" not in i and i[sequence_position] == self.amino_acid and "X" not in i and "U" not in i:
                     temp_window = ProteinAnalysis(windower(i, sequence_position, self.window).strip("\t"))
-                    feat = featurify(temp_window)
+                    feat = featurify(temp_window, (2*self.window+1))
                     test_features.append(feat)
                     test_labels.append(0)
         temp = list(zip(test_features, test_labels))
         random.shuffle(temp)
         test_features, test_labels = zip(*temp)
+
         test_results = self.clf.predict(test_features)
-        report(test_results, test_labels)
-test1 =  ["mlp_adam", "svc", "forest"] #mlp_adam is best
-test2 = ["bag", "ada", "sgd"] #sgd is best
-bestplz = ["sgd", "svc", "mlp_adam"]
-test3 = [test1, test2, bestplz]
-for site in "S":
-    for classy in test3:
-        for ratio in [3, 5, 9]:
-            for window_s in [1,3,7]:
-                for rand_r in [.5,1,3]:
-                    x = Classy(amino_acid=site, classy=classy, window_size=window_s, neg_per_seq=ratio)
+        #print("cross val"+str(cross_val_score(self.clf, test_features, test_labels, cv=5)))
+        report(results=test_results, answers=test_labels, classy=self.clf)
+
+    def predict_seq(self, seq):
+        possible_positions = []
+        for i in range(len(seq)):
+            if seq[i] == self.amino_acid:
+                temp = featurify(ProteinAnalysis(windower(seq, i, self.window)), (2*self.window+1))
+                possible_positions.append([i, self.clf.predict(temp)])
+        print(list(possible_positions))
+
+    def imb(self):
+        sm = SMOTEENN()
+        self.training_features, self.training_labels = sm.fit_sample(self.training_features, self.training_labels)
+
+    def oversample(self):
+        ad = ADASYN()
+        self.training_features, self.training_labels = ad.fit_sample(self.training_features, self.training_labels)
+
+    def understample(self):
+        self.training_features, self.training_labels = RandomUnderSampler().fit_sample(self.training_features, self.training_labels)
+
+
+
+everything = ["svr", "one_svm", "nu_svc"]
+test3 = [ ["mlp_adam","passive_aggro", "nb"] ,["svc", "l_svc", "forest"]]
+bestplz = ["mlp_adam","passive_aggro","p_svc"]
+
+votes = [["svc", "mlp_adam", "nb"], ["svc", "l_svc", "forest"]]
+
+suite = ["mlp_adam"]
+for site in "K":
+    for classy in suite:
+        for ratio in [1]: # try pushing past 9?
+            for window_s in [7]:
+                for rand_r in [1]:
+                    print("still running")
+                    x = Classy(data="Acetylation.csv",amino_acid=site, classy=classy, window_size=window_s, neg_per_seq=ratio, training_ratio=.7)
                     x.generate_data(random_ratio=rand_r)
+                    print("imba start")
+                    x.understample()
+                    print("imba end")
                     x.calculate()
+                    #x.predict_seq("QLLRDNLTLWTSENQGDEGDAGEGEN")
                     print("amino acid: " +site+ " Classy" +str(classy)+ " ratio: " +str(ratio)+ " window_s: " +str(window_s)
                           + " rand_r: "+str(rand_r))
-                    x.test(positive_file="pos.fasta", negative_file="PKA_neg.fasta")
+                    x.test(positive_file="Acetylation_pos.fasta", negative_file="Acetylation_neg.fasta")
+                    del x

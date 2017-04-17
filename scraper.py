@@ -179,15 +179,7 @@ class Classifier:
 
         else:
             print("KNN Failed all Test Cases")
-x = Classifier("temp_test.csv")
-x.split_me(0.7)
-x.get_classy()
-
-
-class Protien_data:
-    peptide_sequence = []
-
-
+x =Janitor()
 
 # Short Term
 # TODO: Clean up code
