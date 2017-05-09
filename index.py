@@ -24,6 +24,11 @@ from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import  ADASYN
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.ensemble import GradientBoostingClassifier
+from imblearn.combine import SMOTETomek
+from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import OneHotEncoder
 print("I am running")
 
 
@@ -38,12 +43,16 @@ def windower(sequence, position, wing_size):
     else:
         return sequence[position - wing_size:position + wing_size]
 
+def test_suite(aa ):
+    pass
+
 
 def featurify(temp_window, size):
     # assumes temp_window = ProteinAnalysis(seq)
-    q = [temp_window.gravy(),temp_window.aromaticity(), temp_window.isoelectric_point(),temp_window.instability_index(),
-         temp_window.secondary_structure_fraction()[0],temp_window.secondary_structure_fraction()[1],
-         temp_window.secondary_structure_fraction()[2]]
+    q = [temp_window.gravy(),
+         temp_window.aromaticity(),
+          temp_window.isoelectric_point()
+         ]
     z = temp_window.amino_acids_content
     order = {}
     counter = 0
@@ -53,6 +62,7 @@ def featurify(temp_window, size):
     for i in range(len(aa)):
         order[aa[i]] = i
         counter +=1
+
     if len(temp_window.sequence) == size:
         for i in temp_window.sequence:
             q.append(order[i])
@@ -61,8 +71,8 @@ def featurify(temp_window, size):
             q.append(order[i])
         for i in range(size - len(temp_window.sequence)):
             q.append(-1)
-
     return q
+
 
 
 
@@ -125,7 +135,7 @@ class Classy:
 
     def __init__(self, data="phosphosites.csv", delimit=",", amino_acid="Y", sites="code",
                  modification="phosphorylation", window_size=7, pos="position", training_ratio=.7,
-                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=10000, classy="forest"):
+                 header_line=0, seq="sequence", neg_per_seq=5, lines_to_read=10000, classy="forest", imba=[]):
         self.classy = classy
         data = pd.read_csv(data, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.data = data.reindex(np.random.permutation(data.index))
@@ -140,7 +150,7 @@ class Classy:
         self.pos_features = []
         self.neg_features = []
         self.pos_seq = []
-
+        self.imba = imba
         self.classif = {"forest": RandomForestClassifier(verbose=0, n_jobs=4),
                            "mlp_adam": MLPClassifier(solver='adam', random_state=1, activation="logistic"),
                            "svc": svm.SVC(), "l_svc": svm.LinearSVC(),
@@ -152,22 +162,19 @@ class Classy:
                             "sgd":GradientBoostingClassifier(),
                             "knn":KNeighborsClassifier(n_neighbors=1),
                             "passive_aggro": PassiveAggressiveClassifier(),"extra": ExtraTreesClassifier(),
-                   "desc_tree": DecisionTreeClassifier(),
-                    "nb":GaussianNB(),
-                   "bnb":BernoulliNB(),
-                        "nu_svc":svm.NuSVC(), "svr":svm.SVR(),"one_svm":svm.OneClassSVM(), "gb":GradientBoostingClassifier()
-
-
-                           }
+                   "desc_tree": DecisionTreeClassifier(),"nb":GaussianNB(),"bnb":BernoulliNB(),
+                        "nu_svc":svm.NuSVC(), "svr":svm.SVR(),"one_svm":svm.OneClassSVM(), "gb":GradientBoostingClassifier()}
         counter = 0
         for i in range(len(data)):
-            if ("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (data[seq][i] not in self.proteins.keys()):
-                self.proteins[data[seq][i]] = [data[pos][i]]
-            elif ("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (
-                data[pos][i] not in self.proteins[data[seq][i]]):
-                self.proteins[data[seq][i]].append(data[pos][i])
-            # print(counter)
-            counter += 1
+            try:
+                if ("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (data[seq][i] not in self.proteins.keys()):
+                    self.proteins[data[seq][i]] = [data[pos][i]]
+                elif ("X" not in data[seq][i]) and (data[sites][i] == amino_acid) and (data[pos][i] not in self.proteins[data[seq][i]]):
+                    self.proteins[data[seq][i]].append(data[pos][i])
+
+                counter += 1
+            except:
+                pass
 
         for i in self.proteins.keys():
             neg_sites = []
@@ -196,26 +203,34 @@ class Classy:
                         pass
 
     def generate_data(self, random_=1, random_ratio=2, random_test=0):
+        imb_fun = {"smote":SMOTEENN(), "under":RandomUnderSampler(), "adasyn":ADASYN(), "ee":EasyEnsemble(), "smotetomek":SMOTETomek()}
         rand_features = []
         neg_labels = [0 for i in range(len(self.neg_features))]
         pos_labels = [1 for i in range(len(self.pos_features))]
+        features = self.pos_features + self.neg_features
+        labels = pos_labels+neg_labels
+        if self.imba != []:
+            for i in self.imba:
+                features, labels = imb_fun[i].fit_sample(features, labels)
         if random_ == 1 and random_ratio > 0:
             for i in range(int((len(self.pos_features)+len(self.neg_features))*random_ratio)):
                 rand_features.append(featurify(ProteinAnalysis(random_seq(locked=self.pos_seq, wing_size=self.window, center=self.amino_acid)), (2*self.window+1)))
         if random_test == 0:
-            features = self.pos_features+self.neg_features
-            labels = pos_labels+neg_labels
+
             temp = list(zip(features, labels))
             random.shuffle(temp)
             features, labels = zip(*temp)
             training_slice = int(self.training_ratio * len(labels))
             self.training_features = list(features[:training_slice])+rand_features
             self.training_labels = list(labels[:training_slice])+[0 for i in range(len(rand_features))]
+
             self.test_features = features[training_slice:]
             self.test_labels = labels[training_slice:]
+
         else:
-            features = self.pos_features+self.neg_features+rand_features
-            labels = pos_labels+neg_labels+[0 for i in range(len(rand_features))]
+            features = features+rand_features
+
+            labels = labels+[0 for i in range(len(rand_features))]
             temp = list(zip(features, labels))
             random.shuffle(temp)
             features, labels = zip(*temp)
@@ -233,7 +248,9 @@ class Classy:
         else:
             for i in self.classy:
                 t_class.append((i, self.classif[i]))
+
             self.clf = VotingClassifier(estimators=t_class)
+
         self.clf.fit(self.training_features, self.training_labels)
         self.results = self.clf.predict(self.test_features)
         #self.rating = precision_recall_fscore_support(self.test_labels, self.results,average="macro")
@@ -269,46 +286,40 @@ class Classy:
 
     def predict_seq(self, seq):
         possible_positions = []
+        seq = seq.upper()
+        for i in "BJOUZ":
+            if i in seq:
+                print("Non valid char in sequence" +i)
+                return -1
         for i in range(len(seq)):
             if seq[i] == self.amino_acid:
                 temp = featurify(ProteinAnalysis(windower(seq, i, self.window)), (2*self.window+1))
-                possible_positions.append([i, self.clf.predict(temp)])
-        print(list(possible_positions))
+                possible_positions.append([i, self.clf.predict(temp)[0]])
+        print(str(list(possible_positions)))
 
-    def imb(self):
-        sm = SMOTEENN()
-        self.training_features, self.training_labels = sm.fit_sample(self.training_features, self.training_labels)
+    def vis(self):
+        pca = PCA(n_components=2)
+        lda = LinearDiscriminantAnalysis(n_components=2)
+        x_np = np.asarray(self.training_features)
+        y_np = np.asarray(self.training_labels)
+        #x_lda = lda.fit(x_np, y_np).transform(y_np)
+        x_pca = pca.fit_transform(x_np)
+        plt.figure()
+        colors = ['navy',"darkorange"]
 
-    def oversample(self):
-        ad = ADASYN()
-        self.training_features, self.training_labels = ad.fit_sample(self.training_features, self.training_labels)
+        lw = 2
 
-    def understample(self):
-        self.training_features, self.training_labels = RandomUnderSampler().fit_sample(self.training_features, self.training_labels)
+        for color, i in zip(colors, [0,1]):
+            plt.scatter(x_pca[y_np == i, 0], x_pca[y_np == i, 1], color=color, alpha=.5, lw=lw)
+        plt.legend(loc='best', shadow=False, scatterpoints=1)
+        plt.title('PCA of dataset')
+        plt.show()
 
 
+x = Classy(data="phosphosites.csv", amino_acid="S", classy="mlp_adam", window_size=7, neg_per_seq=3,
+           training_ratio=.9)
+x.generate_data(random_ratio=1, random_=0)
+print("Benchmark")
 
-everything = ["svr", "one_svm", "nu_svc"]
-test3 = [ ["mlp_adam","passive_aggro", "nb"] ,["svc", "l_svc", "forest"]]
-bestplz = ["mlp_adam","passive_aggro","p_svc"]
-
-votes = [["svc", "mlp_adam", "nb"], ["svc", "l_svc", "forest"]]
-
-suite = ["mlp_adam"]
-for site in "K":
-    for classy in suite:
-        for ratio in [1]: # try pushing past 9?
-            for window_s in [7]:
-                for rand_r in [1]:
-                    print("still running")
-                    x = Classy(data="Acetylation.csv",amino_acid=site, classy=classy, window_size=window_s, neg_per_seq=ratio, training_ratio=.7)
-                    x.generate_data(random_ratio=rand_r)
-                    print("imba start")
-                    x.understample()
-                    print("imba end")
-                    x.calculate()
-                    #x.predict_seq("QLLRDNLTLWTSENQGDEGDAGEGEN")
-                    print("amino acid: " +site+ " Classy" +str(classy)+ " ratio: " +str(ratio)+ " window_s: " +str(window_s)
-                          + " rand_r: "+str(rand_r))
-                    x.test(positive_file="Acetylation_pos.fasta", negative_file="Acetylation_neg.fasta")
-                    del x
+x.calculate()
+x.test("phos_pos.fasta", "phos_neg.fasta")

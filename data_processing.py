@@ -28,9 +28,9 @@ class scrape:
                 print(id)
             except:
                 print("meh")
-qq = [["Phosphorylation/Phosphorylation_H.txt", "h_site.txt"],["Phosphorylation/Phosphorylation_S.txt", "s_site.txt"],["Phosphorylation/Phosphorylation_T.txt", "t_site.txt"],["Phosphorylation/Phosphorylation_Y.txt", "y_site.txt"]]
+qq = [["Phosphorylation/Phosphorylation_T.txt", "t_site.txt"],["Phosphorylation/Phosphorylation_Y.txt", "y_site.txt"]]
 gg = [["N-linked/N-linked_N.txt","n_site.txt"],["Acetylation/Acetylation_K.txt","k_site.txt"]]
-for i in gg:
+for i in qq:
     scrape(i[0], i[1])
 
 
