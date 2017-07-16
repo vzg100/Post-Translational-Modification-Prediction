@@ -6,12 +6,14 @@ A full write up of using supervised learning and class imbalance methods can be 
 
 The supervised methods generate precision and accuracy in the 80-90% range with recall in the 10-20% range.
 
+Recently I have started using unsupervised learning methods with interesting results. The word2vec implementations are averaging around 75 in recall, precision, and accuracy for most post translational modifications tests. This presents a possible solution to the recall issue which has plagued post translational modification prediction for the last decade. 
 
-Word2vec implementations are averaging around 75 in recall, precision, and accuracy for most post translational modifications tests. 
 
-
-TODO:
+# TODO:
 Write FASTA -> CSV converter for benchmark tests
+
 Implement benchmarks into word2vec.
+
 Try prot2vec implementations
+
 Try using exon/intron as an additional feature set.
