@@ -10,3 +10,8 @@ The supervised methods generate precision and accuracy in the 80-90% range with 
 Word2vec implementations are averaging around 75 in recall, precision, and accuracy for most post translational modifications tests. 
 
 
+TODO:
+Write FASTA -> CSV converter for benchmark tests
+Implement benchmarks into word2vec.
+Try prot2vec implementations
+Try using exon/intron as an additional feature set.
