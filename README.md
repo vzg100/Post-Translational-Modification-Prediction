@@ -17,3 +17,7 @@ Implement benchmarks into word2vec.
 Try prot2vec implementations
 
 Try using exon/intron as an additional feature set.
+
+
+### Notes:
+The data posted comes from dbptm.mbc.nctu.edu.tw which is a great rescource for protien related machine learning projects.
