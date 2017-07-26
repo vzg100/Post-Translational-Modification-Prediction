@@ -1,5 +1,4 @@
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import precision_recall_fscore_support
 import pandas as pd
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import random
@@ -7,7 +6,6 @@ from random import randint
 import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn import svm
-from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.ensemble import BaggingClassifier
@@ -19,7 +17,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.naive_bayes import BernoulliNB
 from sklearn.metrics import roc_auc_score
 from imblearn.ensemble import EasyEnsemble
-from sklearn.model_selection import cross_val_score
+
 from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import  ADASYN
 from imblearn.under_sampling import RandomUnderSampler
@@ -28,7 +26,7 @@ from imblearn.combine import SMOTETomek
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import OneHotEncoder
+
 print("I am running")
 
 
@@ -42,9 +40,6 @@ def windower(sequence, position, wing_size):
         return sequence[position - wing_size:]
     else:
         return sequence[position - wing_size:position + wing_size]
-
-def test_suite(aa ):
-    pass
 
 
 def featurify(temp_window, size):
