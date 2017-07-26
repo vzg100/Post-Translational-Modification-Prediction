@@ -4,7 +4,13 @@
 # User-specific stuff:
 .idea/workspace.xml
 .idea/tasks.xml
-
+.idea/mark.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/Post-Translational-Modification-Prediction.iml
+.idea/vcs.xml
 # Sensitive or high-churn files:
 .idea/dataSources/
 .idea/dataSources.ids
