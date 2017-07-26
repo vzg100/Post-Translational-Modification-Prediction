@@ -11,6 +11,7 @@
 .idea/modules.xml
 .idea/Post-Translational-Modification-Prediction.iml
 .idea/vcs.xml
+.idea/dictionaries/mark.xml
 # Sensitive or high-churn files:
 .idea/dataSources/
 .idea/dataSources.ids
