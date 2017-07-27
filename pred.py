@@ -12,32 +12,18 @@ from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import  ADASYN
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTETomek
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_recall_fscore_support
+
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import matplotlib.pyplot as plt
 
-
-def windower(sequence, position, wing_size):
-    # window size = wing_size*2 +1
-    position = int(position)
-    wing_size = int(wing_size)
-    if (position - wing_size) < 0:
-        return sequence[:wing_size + position]
-    if (position + wing_size) > len(sequence):
-        return sequence[position - wing_size:]
-    else:
-        return sequence[position - wing_size:position + wing_size]
-
-
 def chemical_vector(temp_window, size):
     # assumes temp_window = ProteinAnalysis(seq)
     temp_window = ProteinAnalysis(temp_window)
-    q = [temp_window.gravy(),
-         temp_window.aromaticity(),
-         temp_window.isoelectric_point()
-         ]
+    return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
 
-    return q
 
 
 def generate_random_seq(locked, wing_size, center):
@@ -53,46 +39,28 @@ def generate_random_seq(locked, wing_size, center):
         generate_random_seq(locked, wing_size, center)
 
 
-def report_results(results, answers, classy, shift=0):
-    # Turn this into a class
-    tp, fp, fn, tn = 0, 0, 0, 0
-    for i in range(len(results)):
-        if results[i] == 1 and answers[i+shift] == 1:
-            tp += 1
-        elif results[i] == 0 and answers[i+shift] == 0:
-            tn += 1
-        elif results[i] == 1 and answers[i+shift] == 0:
-            fp += 1
-        else:
-            fn += 1
-    if tp != 0 and tn != 0:
-        tpr = tp / (tp + fn)  # aka recall aka true positive rate
-        spc = tn / (tn+fp)  # specificty or true negative rate
-        ppv = tp / (tp + fp)  # positive predicative value aka precision
-        npv = tn/(tn+fn)  # negative predictive value
-        fpr = fp/(fp+tn)  # false positive rate aka fallout
-        fnr = fn/(tp+fn)  # false negative rate
-        fdr = fp/(tp+fp)  # false discovery rate
-        acc = (tp + tn) / (tp + fp + tn + fn)
-        roc = roc_auc_score(answers, results)
-        inf = (tpr+spc)-1
-        mkd = (ppv+npv)-1
-        print(classy)
-        print("Sensitivity:"+str(tpr))
-        print("Specificity :" + str(spc))
-        print("Positive Predictive Value:" + str(ppv))
-        print("Negative Predictive Value:" + str(npv))
-        print("False Positive Rate:" + str(fpr))
-        print("False Negative Rate:" + str(fnr))
-        print("False Discovery Rate:" + str(fdr))
-        print("Accuracy:" + str(acc))
-        print("ROC:" + str(roc))
 
-        print("\n\n")
-        return [tpr, spc, ppv, npv, fpr, fnr, fdr, acc, inf, mkd]
-    else:
-        print("Failed")
-        return False
+class DataCleaner:
+    def __init__(self, file, delimit=",", header_line=0):
+        self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
+
+    def load_data(self, seq="sequence", pos="position"):
+        pass
+
+    def generate_negatives(self, ratio=-1):
+        pass
+
+    def write_data(self, output):
+        pass
+
+class FastaToCSV:
+    def __init__(self, fasta=[]):
+        self.files = []
+        for i in fasta:
+            self.files.appen(open(i))
+
+    def output(self, output):
+        pass
 
 
 class Pred:
@@ -137,14 +105,25 @@ class Pred:
         self.features, self.labels = imba.fit_sample(self.features, self.labels)
 
     def supervised_training(self, classy):
+        print(len(self.features), len(self.labels))
         self.classifier = self.supervised_classifiers[classy]
+        temp = list(zip(self.features, self.labels))
+        random.shuffle(temp)
+        self.features, self.labels = zip(*temp)
+        X_train, X_test, y_train, y_test = train_test_split(
+            self.features, self.labels, test_size = 0.1, random_state = 42)
+
+        self.classifier.fit(X_train, y_train)
+        test_results = self.classifier.predict(X_test)
+        print("Test Results")
+        print(precision_recall_fscore_support(y_test, test_results, labels=[0,1]))
 
 
-
-
+    def plot(self):
+        pass
 
 x = Pred()
 x.load_data(file="data/clean_s.csv")
-x.generate_random_data(.2, "K")
+x.generate_random_data(ratio=.2, amino_acid="S")
 x.vectorize(chemical_vector)
-x.balance_data("ADASYN")
+x.supervised_training("forest")

@@ -311,7 +311,7 @@ class Classy:
         plt.show()
 
 
-x = Classy(data="phosphosites.csv", amino_acid="S", classy="mlp_adam", window_size=7, neg_per_seq=3,
+x = Classy(data="data/k_site.csv", amino_acid="S", classy="mlp_adam", window_size=7, neg_per_seq=3,
            training_ratio=.9)
 x.generate_data(random_ratio=1, random_=0)
 print("Benchmark")
