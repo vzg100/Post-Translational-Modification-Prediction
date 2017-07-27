@@ -36,20 +36,7 @@ def chemical_vector(temp_window, size):
          temp_window.aromaticity(),
          temp_window.isoelectric_point()
          ]
-    order = {}
-    counter = 0
-    aa = "GALMFWKQESPVICYHRNDT"
-    for i in range(len(aa)):
-        order[aa[i]] = i
-        counter += 1
-    if len(temp_window.sequence) == size:
-        for i in temp_window.sequence:
-            q.append(order[i])
-    else:
-        for i in temp_window.sequence:
-            q.append(order[i])
-        for i in range(size - len(temp_window.sequence)):
-            q.append(-1)
+
     return q
 
 
@@ -109,7 +96,7 @@ def report_results(results, answers, classy, shift=0):
 
 
 class Pred:
-    def __init__(self,  window_size=7, training_ratio=.7, seq="sequence", pos="position"):
+    def __init__(self,  window_size=7, training_ratio=.7, seq="sequence", pos="label"):
         self.training_ratio = training_ratio  # Float value representing % of data used for training
         self.features = []
         self.labels = []
@@ -128,27 +115,36 @@ class Pred:
         data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.data = data.reindex(np.random.permutation(data.index))
         for i in range(len(data[self.seq])):
-            try:
-                self.features.append(data[self.seq][i])
-                self.labels.append(data[self.pos][i])
-            except:
-                pass
+            self.features.append(data[self.seq][i])
+            self.labels.append(data[self.pos][i])
+
 
     def generate_random_data(self, ratio, amino_acid):
         temp_len = len(self.features)
-
         for i in range(int(ratio*temp_len)):
             self.features.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size*.5),
                                                      locked=self.data[self.seq]))
             self.labels.append(0)
 
+    def vectorize(self, vectorizer):
+        t = []
+        for i in self.features:
+            t.append(vectorizer(i, len(i)))
+        self.features = t
+
     def balance_data(self, imbalance_function):
-        self.features, self.labels = self.imbalance_functions[imbalance_function].fit(self.features, self.labels)
+        imba = self.imbalance_functions[imbalance_function]
+        self.features, self.labels = imba.fit_sample(self.features, self.labels)
+
+    def supervised_training(self, classy):
+        self.classifier = self.supervised_classifiers[classy]
+
+
+
 
 
 x = Pred()
-x.load_data(file="data/k_site.csv")
-
+x.load_data(file="data/clean_s.csv")
 x.generate_random_data(.2, "K")
-
-x.balance_data("random_under_sample")
+x.vectorize(chemical_vector)
+x.balance_data("ADASYN")
