@@ -294,10 +294,8 @@ class Classy:
 
     def vis(self):
         pca = PCA(n_components=2)
-        lda = LinearDiscriminantAnalysis(n_components=2)
         x_np = np.asarray(self.training_features)
         y_np = np.asarray(self.training_labels)
-        #x_lda = lda.fit(x_np, y_np).transform(y_np)
         x_pca = pca.fit_transform(x_np)
         plt.figure()
         colors = ['navy',"darkorange"]

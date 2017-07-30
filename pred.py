@@ -15,8 +15,9 @@ from imblearn.combine import SMOTETomek
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.decomposition import PCA
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import matplotlib.pyplot as plt
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.preprocessing import StandardScaler
 
 
 def distance(s1: str, s2: str, threshold:float =.9):
@@ -43,6 +44,7 @@ def windower(sequence: str, position: int, wing_size: int):
 
 
 def chemical_vector(temp_window: str):
+    temp_window = temp_window.strip("\"")
     temp_window = ProteinAnalysis(temp_window)
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
 
@@ -70,55 +72,68 @@ class DataCleaner:
         self.wing = wing
 
     def load_data(self, seq: str="sequence", pos:str ="position"):
+
         for i in range(len(self.data[seq])):
-            t = self.data[seq][i]
-            if t not in self.protiens.keys():
-                self.protiens[t] = [self.data[pos][i]]
-            else:
-                self.protiens[t] = self.protiens[t].append(self.data[pos][i])
+            try:
+                t = self.data[seq][i]
+                if t not in self.protiens.keys():
+                    self.protiens[t] = [int(self.data[pos][i])]
+                else:
+                    self.protiens[t] = self.protiens[t].append(int(self.data[pos][i]))
+            except:
+                pass
 
     def generate_positive(self):
         for i in self.protiens.keys():
-            t = self.protiens[i]
-            for j in t:
-                self.sequences.append(windower(sequence=i, position=j-1, wing_size=self.wing))
-                self.labels.append(1)
+            try:
+                t = self.protiens[i]
+                for j in t:
+                    self.sequences.append(windower(sequence=i, position=j-1, wing_size=self.wing))
+                    self.labels.append(1)
+            except:
+                pass
 
     def generate_negatives(self, amino_acid: str, ratio: int=-1, cross_check: int=-1):
         self.count = len(list(self.protiens.keys()))
         if ratio < 0:
             for i in self.protiens.keys():
-                for j in range(len(i)):
-                    if i[j] == amino_acid and j+1 not in self.protiens[i]:
-                        self.sequences.append(windower(sequence=i, position=j, wing_size=self.wing))
-                        self.labels.append(0)
+                try:
+                    for j in range(len(i)):
+                        if i[j] == amino_acid and j+1 not in self.protiens[i]:
+                            self.sequences.append(windower(sequence=i, position=j, wing_size=self.wing))
+                            self.labels.append(0)
+                except:
+                    pass
         else:
             t = len(self.sequences)
             for y in range(int(t*ratio)):
-                for i in self.protiens.keys():
-                    for j in range(len(i)):
-                        if i[j] == amino_acid and j + 1 not in self.protiens[i]:
-                            s = windower(sequence=i, position=j, wing_size=self.wing)
-                            if cross_check < 0:
-                                self.sequences.append(s)
-                                self.labels.append(0)
-                            else:
-                                for subsequence in self.sequences:
-                                    if not distance(s1=subsequence, s2=s):
-                                        self.sequences.append(s)
-                                        self.labels.append(0)
+                try:
+                    for i in self.protiens.keys():
+                        for j in range(len(i)):
+                            if i[j] == amino_acid and j + 1 not in self.protiens[i]:
+                                s = windower(sequence=i, position=j, wing_size=self.wing)
+                                if cross_check < 0:
+                                    self.sequences.append(s)
+                                    self.labels.append(0)
+                                else:
+                                    for subsequence in self.sequences:
+                                        if not distance(s1=subsequence, s2=s):
+                                            self.sequences.append(s)
+                                            self.labels.append(0)
+                except:
+                    pass
 
 
-    def write_data(self, output: str, seq_col: str, label_col: str, shuffle = 0):
-        file = open(output, "W")
-        t = str(seq_col) + "," + str(label_col)
+    def write_data(self, output: str, seq_col: str="sequence", label_col: str="label", shuffle = 0):
+        file = open(output, "w+")
+        t = str(seq_col) + "," + str(label_col)+"\n"
         file.write(t)
         if shuffle != 0:
             temp = list(zip(self.sequences, self.labels))
             random.shuffle(temp)
             self.sequences, self.labels = zip(*temp)
         for i in range(len(self.sequences)):
-            file.write(str(self.sequences[i]) + "," + self.labels[i])
+            file.write(str(self.sequences[i]) + "," + str(self.labels[i]) + "\n")
 
 
 class FastaToCSV:
@@ -146,23 +161,26 @@ class Pred:
                                     "random_under_sample": RandomUnderSampler()}
         self.seq = seq
         self.pos = pos
-
+        self.random_data = 0
 
     def load_data(self, file, delimit=",", header_line=0):
         # Modify these if working with different CSV column names
         data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.data = data.reindex(np.random.permutation(data.index))
         for i in range(len(data[self.seq])):
-            self.features.append(data[self.seq][i])
-            self.labels.append(data[self.pos][i])
+            if type(data[self.seq][i]) == str:
+                self.features.append(data[self.seq][i])
+                self.labels.append(data[self.pos][i])
 
 
     def generate_random_data(self, ratio, amino_acid):
         temp_len = len(self.features)
+        self.random_seq = []
+        self.random_data = 1
         for i in range(int(ratio*temp_len)):
-            self.features.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size*.5),
+            self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size*.5),
                                                      locked=self.data[self.seq]))
-            self.labels.append(0)
+
 
     def vectorize(self, vectorizer):
         t = []
@@ -175,27 +193,47 @@ class Pred:
         self.features, self.labels = imba.fit_sample(self.features, self.labels)
 
     def supervised_training(self, classy):
+        std_features = self.features
+        #std_features = StandardScaler().fit_transform(X=self.features)
         print(len(self.features), len(self.labels))
         self.classifier = self.supervised_classifiers[classy]
-        temp = list(zip(self.features, self.labels))
+        temp = list(zip(std_features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
-        X_train, X_test, y_train, y_test = train_test_split(self.features, self.labels,
+        self.X_train, self.X_test, y_train, y_test = train_test_split(std_features, self.labels,
                                                             test_size = 0.1, random_state = 42)
+        if self.random_data > 0:
+            for i in self.random_seq:
+                self.X_train.append(i)
+                y_train.append(0)
 
-        self.classifier.fit(X_train, y_train)
-        test_results = self.classifier.predict(X_test)
+        self.classifier.fit(self.X_train, y_train)
+        self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
-        print(precision_recall_fscore_support(y_test, test_results, labels=[0, 1]))
+        print(precision_recall_fscore_support(y_test, self.test_results, labels=[0, 1]))
 
 
-    def plot(self):
-        pass
+    def generate_pca(self):
+        pca = PCA(n_components=2)
+        X_r = pca.fit_transform(np.asarray(self.features))
+        plt.scatter(X_r[:, 0], X_r[:, 1], c="y")
+        plt.show()
 
-#Remove Randoms from Test Data set
 
-x = Pred()
-x.load_data(file="data/clean_s.csv")
-x.generate_random_data(ratio=.2, amino_acid="S")
-x.vectorize(chemical_vector)
-x.supervised_training("forest")
+
+
+
+
+"""
+x = DataCleaner("data/k_site.csv")
+x.load_data()
+x.generate_positive()
+x.generate_negatives(cross_check=1, amino_acid="K")
+x.write_data("data/clean_k2.csv")
+"""
+y = Pred()
+y.load_data(file="data/clean_k2.csv")
+y.vectorize(chemical_vector)
+y.balance_data("ADASYN")
+y.supervised_training("forest")
+y.generate_pca()
