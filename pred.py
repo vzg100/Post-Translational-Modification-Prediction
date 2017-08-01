@@ -193,6 +193,7 @@ class Pred:
         self.features, self.labels = imba.fit_sample(self.features, self.labels)
 
     def supervised_training(self, classy):
+        self.features = list(self.features)
         std_features = self.features
         #std_features = StandardScaler().fit_transform(X=self.features)
         print(len(self.features), len(self.labels))
@@ -200,24 +201,30 @@ class Pred:
         temp = list(zip(std_features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
-        self.X_train, self.X_test, y_train, y_test = train_test_split(std_features, self.labels,
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(std_features, self.labels,
                                                             test_size = 0.1, random_state = 42)
         if self.random_data > 0:
             for i in self.random_seq:
                 self.X_train.append(i)
-                y_train.append(0)
+                self.y_train.append(0)
 
-        self.classifier.fit(self.X_train, y_train)
+        self.classifier.fit(self.X_train, self.y_train)
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
-        print(precision_recall_fscore_support(y_test, self.test_results, labels=[0, 1]))
-
+        print(precision_recall_fscore_support(self.y_test, self.test_results, labels=[0, 1]))
 
     def generate_pca(self):
+        y= np.arange(len(self.features))
         pca = PCA(n_components=2)
-        X_r = pca.fit_transform(np.asarray(self.features))
-        plt.scatter(X_r[:, 0], X_r[:, 1], c="y")
+        x_np = np.asarray(self.features)
+        pca.fit(x_np)
+        X_reduced = pca.transform(x_np)
+        plt.figure(figsize=(10, 8))
+        plt.scatter(X_reduced[:, 0], X_reduced[:, 1], c=y, cmap='RdBu', s=1)
+        plt.xlabel('First component')
+        plt.ylabel('Second component')
         plt.show()
+
 
 
 
