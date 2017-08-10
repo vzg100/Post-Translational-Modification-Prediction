@@ -6,19 +6,23 @@ from random import randint
 import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn import svm
-from sklearn.metrics import roc_auc_score
 from imblearn.ensemble import EasyEnsemble
 from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import  ADASYN
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTETomek
+from imblearn.under_sampling import CondensedNearestNeighbour
+from imblearn.under_sampling import NearMiss
+from imblearn.under_sampling import NeighbourhoodCleaningRule
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.preprocessing import StandardScaler
-
+from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MaxAbsScaler
+import os
 
 def distance(s1: str, s2: str, threshold:float =.9):
     t = 0
@@ -47,6 +51,9 @@ def chemical_vector(temp_window: str):
     temp_window = temp_window.strip("\"")
     temp_window = ProteinAnalysis(temp_window)
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
+
+def sequence_vector(temp_window: str, seq_size: int = 21):
+    pass
 
 
 def generate_random_seq(locked: list, wing_size: int, center: str):
@@ -138,13 +145,23 @@ class DataCleaner:
 
 class FastaToCSV:
     # More Benchmarks
-    def __init__(self, fasta: list):
-        self.files = []
-        for i in fasta:
-            self.files.append(open(i))
+    def __init__(self, directory: str, output:str, sequence: str="sequence", label: str="label"):
 
-    def output(self, output):
-        pass
+        output = open(output, "w+")
+        output.write(sequence+","+label+"\n")
+        for i in os.listdir(directory):
+            label = 0
+            f = open(i)
+            if "pos" in i:
+                label = 1
+            for line in f:
+                if ">" not in line:
+                    output.write(line + ","+ str(label)+"\n")
+            f.close()
+        output.close()
+
+
+
 
 
 class Pred:
@@ -158,7 +175,8 @@ class Pred:
                                        "svc": svm.SVC()}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
-                                    "random_under_sample": RandomUnderSampler()}
+                                    "random_under_sample": RandomUnderSampler(), "ncl":NeighbourhoodCleaningRule(),
+                                    "near_miss":NearMiss()}
         self.seq = seq
         self.pos = pos
         self.random_data = 0
@@ -172,7 +190,6 @@ class Pred:
                 self.features.append(data[self.seq][i])
                 self.labels.append(data[self.pos][i])
 
-
     def generate_random_data(self, ratio, amino_acid):
         temp_len = len(self.features)
         self.random_seq = []
@@ -181,9 +198,9 @@ class Pred:
             self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size*.5),
                                                      locked=self.data[self.seq]))
 
-
     def vectorize(self, vectorizer):
         t = []
+        self.vector = vectorizer
         for i in self.features:
             t.append(vectorizer(i))
         self.features = t
@@ -192,21 +209,23 @@ class Pred:
         imba = self.imbalance_functions[imbalance_function]
         self.features, self.labels = imba.fit_sample(self.features, self.labels)
 
-    def supervised_training(self, classy):
+    def supervised_training(self, classy: str, scale: str =-1):
         self.features = list(self.features)
-        std_features = self.features
-        #std_features = StandardScaler().fit_transform(X=self.features)
         print(len(self.features), len(self.labels))
         self.classifier = self.supervised_classifiers[classy]
-        temp = list(zip(std_features, self.labels))
+        temp = list(zip(self.features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(std_features, self.labels,
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
                                                             test_size = 0.1, random_state = 42)
         if self.random_data > 0:
-            for i in self.random_seq:
-                self.X_train.append(i)
-                self.y_train.append(0)
+            for i in range(len(self.random_seq)):
+                np.append(self.X_train, self.vector(self.random_seq[i]))
+                np.append( self.y_train, 0)
+        if scale != -1:
+            st = {"standard":StandardScaler(), "robust": RobustScaler(), "minmax":MinMaxScaler(), "max":MaxAbsScaler()}
+            self.X_train = st[scale].fit_transform(X=self.X_train)
+            self.X_test = st[scale].fit_transform(X=self.X_test)
 
         self.classifier.fit(self.X_train, self.y_train)
         self.test_results = self.classifier.predict(self.X_test)
@@ -226,11 +245,6 @@ class Pred:
         plt.show()
 
 
-
-
-
-
-
 """
 x = DataCleaner("data/k_site.csv")
 x.load_data()
@@ -240,7 +254,8 @@ x.write_data("data/clean_k2.csv")
 """
 y = Pred()
 y.load_data(file="data/clean_k2.csv")
+y.generate_random_data(1, amino_acid="K")
 y.vectorize(chemical_vector)
-y.balance_data("ADASYN")
-y.supervised_training("forest")
+#y.balance_data("near_miss")
+y.supervised_training("mlp_adam", scale="standard")
 y.generate_pca()
