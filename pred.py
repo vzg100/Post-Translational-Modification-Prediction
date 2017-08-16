@@ -11,7 +11,8 @@ from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import  ADASYN
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTETomek
-from imblearn.under_sampling import CondensedNearestNeighbour
+from gensim.models import word2vec
+from sklearn.cluster import KMeans
 from imblearn.under_sampling import NearMiss
 from imblearn.under_sampling import NeighbourhoodCleaningRule
 from sklearn.model_selection import train_test_split
@@ -24,6 +25,15 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import MaxAbsScaler
 import os
 
+def bag_of_centroids(wordlist, word_centroid_map):
+    num_centroids = max(word_centroid_map.values()) + 1
+    bag_of_centroids = np.zeros(num_centroids, dtype="float32")
+    for word in wordlist:
+        if word in word_centroid_map:
+            index = word_centroid_map[word]
+            bag_of_centroids[index] += 1
+    return bag_of_centroids
+
 def distance(s1: str, s2: str, threshold:float =.9):
     t = 0
     for i in range(len(s1)):
@@ -33,7 +43,6 @@ def distance(s1: str, s2: str, threshold:float =.9):
         return False
     else:
         return True
-
 
 def windower(sequence: str, position: int, wing_size: int):
     # window size = wing_size*2 +1
@@ -52,8 +61,24 @@ def chemical_vector(temp_window: str):
     temp_window = ProteinAnalysis(temp_window)
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
 
-def sequence_vector(temp_window: str, seq_size: int = 21):
-    pass
+def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1):
+    temp_window = temp_window.strip("\"")
+    vec = []
+    aa = {"G":1, "A":2, "L":3, "M":4, "F":5, "W":6, "K":7, "Q":8, "E":9, "S": 10, "P":11, "V":12, "I":13, "C":14, "Y":15, "H":16, "R":17, "N":18, "D":19, "T":20}
+    for i in temp_window:
+        vec.append(aa[i])
+    if len(vec) != seq_size:
+        t=len(vec)
+        for i in range(seq_size-t):
+            vec.append(0)
+    if hydrophobicity == 1:
+        vec.append(ProteinAnalysis(temp_window).gravy())
+    return vec
+
+def hydrophobicity_vector(temp_window: str):
+    temp_window = temp_window.strip("\"")
+    temp_window = ProteinAnalysis(temp_window)
+    return [temp_window.gravy()]
 
 
 def generate_random_seq(locked: list, wing_size: int, center: str):
@@ -169,6 +194,7 @@ class Pred:
         self.training_ratio = training_ratio  # Float value representing % of data used for training
         self.features = []
         self.labels = []
+        self.words = []
         self.window_size = window_size
         self.supervised_classifiers = {"forest": RandomForestClassifier(n_jobs=4),
                                        "mlp_adam": MLPClassifier(activation="logistic"),
@@ -191,25 +217,35 @@ class Pred:
                 self.labels.append(data[self.pos][i])
 
     def generate_random_data(self, ratio, amino_acid):
+        print("Loading Data")
         temp_len = len(self.features)
         self.random_seq = []
         self.random_data = 1
         for i in range(int(ratio*temp_len)):
             self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size*.5),
                                                      locked=self.data[self.seq]))
+        print("Loaded Data")
 
     def vectorize(self, vectorizer):
+        print("Applying Vector Function")
         t = []
         self.vector = vectorizer
         for i in self.features:
             t.append(vectorizer(i))
         self.features = t
+        print("Finished Applying Vector Function")
 
     def balance_data(self, imbalance_function):
+        print("Balancing Data")
         imba = self.imbalance_functions[imbalance_function]
         self.features, self.labels = imba.fit_sample(self.features, self.labels)
+        print("Balanced Data")
+
+    def word2vec(self):
+        pass
 
     def supervised_training(self, classy: str, scale: str =-1):
+        print("Starting Training")
         self.features = list(self.features)
         print(len(self.features), len(self.labels))
         self.classifier = self.supervised_classifiers[classy]
@@ -253,9 +289,9 @@ x.generate_negatives(cross_check=1, amino_acid="K")
 x.write_data("data/clean_k2.csv")
 """
 y = Pred()
-y.load_data(file="data/clean_k2.csv")
-y.generate_random_data(1, amino_acid="K")
-y.vectorize(chemical_vector)
-#y.balance_data("near_miss")
-y.supervised_training("mlp_adam", scale="standard")
-y.generate_pca()
+y.load_data(file="data/clean_s.csv")
+y.generate_random_data(1, amino_acid="S")
+y.vectorize(sequence_vector)
+#y.balance_data("ADASYN")
+y.supervised_training("forest")
+#y.generate_pca()
