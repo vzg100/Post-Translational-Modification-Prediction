@@ -1,3 +1,5 @@
+Long term goal is to develop into an easy to use library for rapid prototyping and development of PTM tools. Called ptm_Pred
+
 # Post Translational Modification Prediction 
 Capstone project for Senior Year at Tulane University 
 
