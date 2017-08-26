@@ -165,6 +165,4 @@ def bag_of_centroids(wordlist, word_centroid_map):
     return bag_of_centroids
 
 
-y= DataCleaner(amino_acid="K", data="k_site.csv", output="clean_k.csv")
-x= Classy(data="clean_k.csv")
-x.kluster()
+y= DataCleaner(amino_acid="H", data="Data/Training/raw/Phosphorylation_H.txt", output="Data/Training/Phosphorylation_H.txt")
