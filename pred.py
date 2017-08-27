@@ -11,8 +11,7 @@ from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import ADASYN
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTETomek
-from gensim.models import word2vec
-from sklearn.cluster import KMeans
+from sklearn.manifold import TSNE
 from imblearn.under_sampling import NearMiss
 from imblearn.under_sampling import NeighbourhoodCleaningRule
 from sklearn.model_selection import train_test_split
@@ -62,17 +61,17 @@ def chemical_vector(temp_window: str):
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
 
 # noinspection PyDefaultArgument
-def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, strip=["\"", "B", "X", "Z", "U"]):
+def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, trash=["\"", "B", "X", "Z", "U", "X"]):
     """
     This vector takes the sequence and has each amino acid represented by an int
     0 represents nonstandard amino acids or as fluff for tails/heads of sequences
     Strip is a list which can be modified as user needs call for
     """
-    for i in strip:
-        temp_window = temp_window.strip(i)
+    for i in trash:
+        temp_window = temp_window.replace(i, "")
     vec = []
     aa = {"G": 1, "A": 2, "L": 3, "M": 4, "F": 5, "W": 6, "K": 7, "Q": 8, "E": 9, "S": 10, "P": 11, "V": 12, "I": 13,
-          "C": 14, "Y": 15, "H": 16, "R": 17, "N": 18, "D": 19, "T": 20}
+          "C": 14, "Y": 15, "H": 16, "R": 17, "N": 18, "D": 19, "T": 20, "X": 0}
 
     for i in temp_window:
         vec.append(aa[i])
@@ -249,7 +248,7 @@ class FastaToCSV:
 
 
 # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
-class Pred:
+class Predictor:
     """
     The prototyping tool, meant to work with data outputted by datacleaner
 
@@ -380,6 +379,16 @@ class Pred:
         plt.ylabel('Second component')
         plt.show()
 
+    def generate_tsne(self):
+        y = np.arange(len(self.features))
+        tsne = TSNE(n_components=2)
+        x_np = np.asarray(self.features)
+        X_reduced = tsne.fit_transform(x_np)
+        plt.figure(figsize=(10, 8))
+        plt.scatter(X_reduced[:, 0], X_reduced[:, 1], c=y, cmap='RdBu', s=1)
+        plt.xlabel('First component')
+        plt.ylabel('Second component')
+        plt.show()
 
 """
 x = DataCleaner("/Users/mark/PycharmProjects/phosphosites.csv")
@@ -388,10 +397,3 @@ x.generate_positive()
 x.generate_negatives(cross_check=1, amino_acid="H")
 x.write_data("Data/Training/clean_h.csv")
 """
-y = Pred()
-y.load_data(file="Data/Training/clean_h.csv")
-y.generate_random_data(1, amino_acid="N")
-y.vectorize("sequence")
-# y.balance_data("ADASYN")
-y.supervised_training("forest")
-y.generate_pca()
