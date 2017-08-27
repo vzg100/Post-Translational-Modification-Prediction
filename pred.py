@@ -8,7 +8,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn import svm
 from imblearn.ensemble import EasyEnsemble
 from imblearn.combine import SMOTEENN
-from imblearn.over_sampling import  ADASYN
+from imblearn.over_sampling import ADASYN
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTETomek
 from gensim.models import word2vec
@@ -26,15 +26,16 @@ from sklearn.preprocessing import MaxAbsScaler
 import os
 
 
-def distance(s1: str, s2: str, threshold:float =.9):
+def distance(s1: str, s2: str, threshold: float =.9):
     t = 0
     for i in range(len(s1)):
         if s1[i] != s2[i]:
-            t+=1
-    if (len(s1)-t)/s2 < threshold:
+            t += 1
+    if (len(s1)-t) / s2 < threshold:
         return False
     else:
         return True
+
 
 def windower(sequence: str, position: int, wing_size: int):
     # final window size is wing_size*2 +1
@@ -60,6 +61,7 @@ def chemical_vector(temp_window: str):
     temp_window = ProteinAnalysis(temp_window)
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
 
+# noinspection PyDefaultArgument
 def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, strip=["\"", "B", "X", "Z", "U"]):
     """
     This vector takes the sequence and has each amino acid represented by an int
@@ -69,7 +71,8 @@ def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, stri
     for i in strip:
         temp_window = temp_window.strip(i)
     vec = []
-    aa = {"G":1, "A":2, "L":3, "M":4, "F":5, "W":6, "K":7, "Q":8, "E":9, "S": 10, "P":11, "V":12, "I":13, "C":14, "Y":15, "H":16, "R":17, "N":18, "D":19, "T":20}
+    aa = {"G": 1, "A": 2, "L": 3, "M": 4, "F": 5, "W": 6, "K": 7, "Q": 8, "E": 9, "S": 10, "P": 11, "V": 12, "I": 13,
+          "C": 14, "Y": 15, "H": 16, "R": 17, "N": 18, "D": 19, "T": 20}
 
     for i in temp_window:
         vec.append(aa[i])
@@ -114,7 +117,8 @@ class DataCleaner:
     Cleans up data from various csvs with different organizational preferences
     Assumes column names are sequence, code, and position
     Enables the user to generate negative examples, sequences which aren't in the known positives are assumed to negative
-    I chose to make the DataCleaner require extra steps to run since I am assuming people using it come from a non CS background and
+    I chose to make the DataCleaner require extra steps to run since I am assuming people using it come from a
+    non CS background and
     the extra steps are meant to enable easier debugging and understanding of the flow
     """
     def __init__(self, file: str, delimit: str =",", header_line: int=0, wing=10):
@@ -123,7 +127,8 @@ class DataCleaner:
         :param file: Input file
         :param delimit: What delimiter is used by the csv
         :param header_line: Used by pandas to determine the header
-        :param wing: how long the seq is on either side of the modified amino acid - for example wing size of 2 on X would be AAXAA
+        :param wing: how long the seq is on either side of the modified amino acid
+        For example wing size of 2 on X would be AAXAA
         """
         self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.protiens = {}
@@ -132,13 +137,14 @@ class DataCleaner:
         self.sequences = []
         self.wing = wing
 
-    def load_data(self, amino_acid:str, aa: str="code", seq: str="sequence", pos:str ="position"):
+    def load_data(self, amino_acid: str, aa: str="code", seq: str="sequence", pos: str ="position"):
         """
         Loads the data into the object
         :param amino_acid: Which amino acid is the ptm found on
         :param aa: the column name for the amino acid modified in the PTM site
         :param seq: the column name for the FULL protien sequence
-        :param pos: the column name for where the ptm occurs in the PTM, assumed it is 1-based index and the code adjusts for that
+        :param pos: the column name for where the ptm occurs in the PTM,
+        Assumed it is 1-based index and the code adjusts for that
         :return: loads data into the data cleaner object
         """
         for i in range(len(self.data[seq])):
@@ -151,7 +157,6 @@ class DataCleaner:
                         self.protiens[t] = self.protiens[t].append(int(self.data[pos][i]))
                 except:
                     pass
-
 
     def generate_positive(self):
         """
@@ -172,7 +177,9 @@ class DataCleaner:
         Finds assumed negatives in the sequences, can control the ratio and whether
         :param amino_acid: The amino acid where the PTM occurs on, used for generating the negative
         :param ratio: if -1 just adds every presumed negative, otherwise use float/int value to determine
-        :param cross_check: if -1 doesnt cross check otherwise it ensures that no negative sequences extracted match positive sequences WARNING: The larger the data the longer it will take
+        :param cross_check: if -1 doesnt cross check otherwise it ensures
+        that no negative sequences extracted match positive sequences
+        WARNING: The larger the data the longer it will take
         :return: Adds negatives to data in the object
         """
         self.count = len(list(self.protiens.keys()))
@@ -204,8 +211,7 @@ class DataCleaner:
                 except:
                     pass
 
-
-    def write_data(self, output: str, seq_col: str="sequence", label_col: str="label", shuffle = 0):
+    def write_data(self, output: str, seq_col: str="sequence", label_col: str="label", shuffle=0):
         """
         Writes the data to an output file
         :param output: Output file name
@@ -227,7 +233,7 @@ class DataCleaner:
 
 class FastaToCSV:
     # More Benchmarks
-    def __init__(self, directory: str, output:str, sequence: str="sequence", label: str="label"):
+    def __init__(self, directory: str, output: str, sequence: str="sequence", label: str="label"):
         output = open(output, "w+")
         output.write(sequence+","+label+"\n")
         for i in os.listdir(directory):
@@ -237,11 +243,12 @@ class FastaToCSV:
                 label = 1
             for line in f:
                 if ">" not in line:
-                    output.write(line + ","+ str(label)+"\n")
+                    output.write(line + "," + str(label)+"\n")
             f.close()
         output.close()
 
 
+# noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
 class Pred:
     """
     The prototyping tool, meant to work with data outputted by datacleaner
@@ -258,13 +265,14 @@ class Pred:
                                        "svc": svm.SVC()}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
-                                    "random_under_sample": RandomUnderSampler(), "ncl":NeighbourhoodCleaningRule(),
-                                    "near_miss":NearMiss()}
+                                    "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
+                                    "near_miss": NearMiss()}
         self.seq = seq
         self.pos = pos
         self.random_data = 0
         self.test_results = 0
-
+        self.vecs = {"sequence": sequence_vector, "chemistry": chemical_vector, "hydrophobicity": hydrophobicity_vector}
+        self.vector = 0
 
     def load_data(self, file, delimit=",", header_line=0):
         """
@@ -296,7 +304,7 @@ class Pred:
         self.random_data = 1
         for i in range(int(ratio*temp_len)):
             self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size*.5),
-                                                     locked=self.data[self.seq]))
+                                                            locked=self.data[self.seq]))
         print("Loaded Data")
 
     def vectorize(self, vectorizer):
@@ -308,9 +316,10 @@ class Pred:
         """
         print("Applying Vector Function")
         t = []
-        self.vector = vectorizer
+
+        self.vector = self.vecs[vectorizer]
         for i in self.features:
-            t.append(vectorizer(i))
+            t.append(self.vector(i))
         self.features = t
         print("Finished Applying Vector Function")
 
@@ -340,13 +349,13 @@ class Pred:
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
-                                                            test_size = 0.1, random_state = 42)
+                                                                        test_size=0.1, random_state=42)
         if self.random_data > 0:
             for i in range(len(self.random_seq)):
                 np.append(self.X_train, self.vector(self.random_seq[i]))
                 np.append(self.y_train, 0)
         if scale != -1:
-            st = {"standard":StandardScaler(), "robust": RobustScaler(), "minmax":MinMaxScaler(), "max":MaxAbsScaler()}
+            st = {"standard":StandardScaler(), "robust": RobustScaler(), "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
             self.X_train = st[scale].fit_transform(X=self.X_train)
             self.X_test = st[scale].fit_transform(X=self.X_test)
 
@@ -382,7 +391,7 @@ x.write_data("Data/Training/clean_h.csv")
 y = Pred()
 y.load_data(file="Data/Training/clean_h.csv")
 y.generate_random_data(1, amino_acid="N")
-y.vectorize(sequence_vector)
-#y.balance_data("ADASYN")
+y.vectorize("sequence")
+# y.balance_data("ADASYN")
 y.supervised_training("forest")
 y.generate_pca()

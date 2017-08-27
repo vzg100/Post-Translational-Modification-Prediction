@@ -126,6 +126,7 @@ def report(results, answers, classy,shift=0):
         return False
 
 
+# noinspection PyAugmentAssignment,PyDefaultArgument,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
 class Classy:
 
     def __init__(self, data="phosphosites.csv", delimit=",", amino_acid="Y", sites="code",
@@ -204,7 +205,7 @@ class Classy:
         pos_labels = [1 for i in range(len(self.pos_features))]
         features = self.pos_features + self.neg_features
         labels = pos_labels+neg_labels
-        if self.imba != []:
+        if self.imba:
             for i in self.imba:
                 features, labels = imb_fun[i].fit_sample(features, labels)
         if random_ == 1 and random_ratio > 0:

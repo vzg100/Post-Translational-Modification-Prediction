@@ -179,7 +179,6 @@ class Classifier:
 
         else:
             print("KNN Failed all Test Cases")
-x =Janitor()
 
 # Short Term
 # TODO: Clean up code
