@@ -232,19 +232,10 @@ class DataCleaner:
 
 class FastaToCSV:
     # More Benchmarks
-    def __init__(self, directory: str, output: str, sequence: str="sequence", label: str="label"):
-        output = open(output, "w+")
-        output.write(sequence+","+label+"\n")
-        for i in os.listdir(directory):
-            label = 0
-            f = open(i)
-            if "pos" in i:
-                label = 1
-            for line in f:
-                if ">" not in line:
-                    output.write(line + "," + str(label)+"\n")
-            f.close()
-        output.close()
+    def __init__(self, negative: str, postive: str, output: str, sequence: str="sequence", label: str="label", code: str="code"):
+        f = open(output)
+        
+
 
 
 # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
@@ -397,3 +388,5 @@ x.generate_positive()
 x.generate_negatives(cross_check=1, amino_acid="H")
 x.write_data("Data/Training/clean_h.csv")
 """
+for i in ["Phosphorylation_CDK1", "Phosphorylation_CK2", "Phosphorylation_MAPK1", "Phosphorylation_PKA", "Phosphorylation_PKC"]:
+    y = FastaToCSV(output="Data/Benchmarks/phosphorylation.csv", directory="Data/Benchmarks/Raw")
