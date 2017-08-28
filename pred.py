@@ -23,6 +23,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import MaxAbsScaler
 import os
+from sklearn.metrics import classification_report
 
 
 def distance(s1: str, s2: str, threshold: float =.9):
@@ -232,9 +233,28 @@ class DataCleaner:
 
 class FastaToCSV:
     # More Benchmarks
-    def __init__(self, negative: str, postive: str, output: str, sequence: str="sequence", label: str="label", code: str="code"):
-        f = open(output)
-        
+    def __init__(self, negative: str, positive: str, output: str):
+        write_head = 0
+        if not os.path.isfile(output):
+            write_head = 1
+        output = open(output, "a+")
+        if write_head == 1:
+            output.write("sequence,label,code\n")
+        negative = open(negative)
+        for line in negative:
+            if ">" not in line:
+                line = line.replace("\n", "")
+                s = line+","+str(0)+","+line[10]+"\n"
+                output.write(s)
+        negative.close()
+        positive = open(positive)
+        for line in positive:
+            line = line.replace("\n", "")
+            if ">" not in line:
+                s = line+","+str(1)+","+line[10]+"\n"
+                output.write(s)
+        positive.close()
+        output.close()
 
 
 
@@ -339,7 +359,7 @@ class Predictor:
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
-                                                                        test_size=0.1, random_state=42)
+                                                                        test_size=0.3, random_state=42)
         if self.random_data > 0:
             for i in range(len(self.random_seq)):
                 np.append(self.X_train, self.vector(self.random_seq[i]))
@@ -350,9 +370,40 @@ class Predictor:
             self.X_test = st[scale].fit_transform(X=self.X_test)
 
         self.classifier.fit(self.X_train, self.y_train)
+        print("Done training")
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
-        print(precision_recall_fscore_support(self.y_test, self.test_results, labels=[0, 1]))
+        print(classification_report(y_pred=self.test_results, y_true=self.y_test, target_names=["Non PTM", "PTM"]))
+
+    def benchmark(self, benchmark: str, aa: str):
+        benchmark = open(benchmark)
+        validation = []
+        answer_key = []
+        for i in benchmark:
+
+            s = i.split(",")
+            label = s[1].replace("\n", "").replace("\t", "")
+            seq = s[0].replace("\n", "").replace("\t", "")
+            code = s[2].replace("\n", "").replace("\t", "")
+
+            if aa == code:
+                validation.append(self.vector(seq))
+                answer_key.append(int(label))
+        v = self.classifier.predict(validation)
+        v.reshape(len(v), 1)
+        answer_key = np.asarray(answer_key)
+        answer_key.reshape(len(answer_key), 1)
+        t= []
+        for i in v:
+            t.append(int(i))
+        v = np.asarray(t).reshape(len(t), 1)
+        for i in range(len(answer_key)):
+            if answer_key[i] != 0 and answer_key[i] != 1:
+                print(i, "answer")
+            if v[i] != 0 and v[i] != 1:
+                print(i, "V", v[i], type(v[i]))
+        print(precision_recall_fscore_support(v,  answer_key, labels=[1]))
+        print(classification_report(y_pred=v, y_true=answer_key, target_names=["Non PTM", "PTM"]))
 
     def generate_pca(self):
         """
@@ -381,6 +432,16 @@ class Predictor:
         plt.ylabel('Second component')
         plt.show()
 
+    def test_seq(self, s: str):
+        s= self.vector(s)
+        return self.classifier.predict(s)
+
+    def test_sequences(self, s: list):
+        t = []
+        for i in s:
+            t.append(self.vector(i))
+        return self.classifier.predict(t)
+
 """
 x = DataCleaner("/Users/mark/PycharmProjects/phosphosites.csv")
 x.load_data(amino_acid="H")
@@ -388,5 +449,4 @@ x.generate_positive()
 x.generate_negatives(cross_check=1, amino_acid="H")
 x.write_data("Data/Training/clean_h.csv")
 """
-for i in ["Phosphorylation_CDK1", "Phosphorylation_CK2", "Phosphorylation_MAPK1", "Phosphorylation_PKA", "Phosphorylation_PKC"]:
-    y = FastaToCSV(output="Data/Benchmarks/phosphorylation.csv", directory="Data/Benchmarks/Raw")
+x = FastaToCSV(negative="Data/Benchmarks/Raw/PKC_neg.fasta", positive="Data/Benchmarks/Raw/PKC_pos.fasta", output="Data/Benchmarks/phos.csv")
