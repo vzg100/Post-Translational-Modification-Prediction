@@ -364,7 +364,7 @@ class Predictor:
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
-                                    "near_miss": NearMiss()}
+                                    "near_miss": NearMiss(), "pass":-1}
         self.seq = seq
         self.pos = pos
         self.random_data = 0
@@ -427,10 +427,11 @@ class Predictor:
         :param imbalance_function: imblearn function of choice, it is a string
         :return: balanced data
         """
-        print("Balancing Data")
-        imba = self.imbalance_functions[imbalance_function]
-        self.features, self.labels = imba.fit_sample(self.features, self.labels)
-        print("Balanced Data")
+        if self.imbalance_functions[imbalance_function] != -1
+            print("Balancing Data")
+            imba = self.imbalance_functions[imbalance_function]
+            self.features, self.labels = imba.fit_sample(self.features, self.labels)
+            print("Balanced Data")
 
     def supervised_training(self, classy: str, scale: str =-1):
         """
@@ -469,8 +470,6 @@ class Predictor:
         print("Done training")
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
-        #print(classification_report(y_pred=self.test_results, y_true=self.y_test, target_names=["Non PTM", "PTM"]))
-        #print("Accuracy", accuracy_score(y_true=self.y_test, y_pred=self.test_results))
         print(report(answers=self.y_test, results=self.test_results))
 
     def benchmark(self, benchmark: str, aa: str):
@@ -502,8 +501,6 @@ class Predictor:
             if v[i] != 0 and v[i] != 1:
                 print(i, "V", v[i], type(v[i]))
 
-        #print(classification_report(y_pred=v, y_true=answer_key, target_names=["Non PTM", "PTM"]))
-        #print("Accuracy:", accuracy_score(y_true=answer_key, y_pred=v))
         print("Benchmark Results ")
         print(report(answers=answer_key, results=v))
 
@@ -551,21 +548,24 @@ x.generate_positive()
 x.generate_negatives(cross_check=1, amino_acid="H")
 x.write_data("Data/Training/clean_h.csv")
 """
-
-y = Predictor()
-y.load_data(file="Data/Training/clean_t.csv")
-#y.generate_random_data(1, amino_acid="Y")
-y.vectorize("sequence")
-#y.balance_data("near_miss")
-y.supervised_training("mlp_adam")
-y.benchmark("Data/Benchmarks/phos.csv", "T")
-del y
-x = Predictor()
-x.load_data(file="Data/Training/clean_t.csv")
-x.generate_random_data(1, amino_acid="T")
-x.vectorize("sequence")
-#x.balance_data("near_miss")
-x.supervised_training("mlp_adam")
-x.benchmark("Data/Benchmarks/phos.csv", "T")
-print("Done")
-del x
+par = ["pass", "ADASYN", "SMOTEENN", "random_under_sample", "ncl", "near_miss"]
+for i in par:
+    print("y", par)
+    y = Predictor()
+    y.load_data(file="Data/Training/clean_t.csv")
+    #y.generate_random_data(1, amino_acid="Y")
+    y.vectorize("sequence")
+    y.balance_data(par)
+    y.supervised_training("mlp_adam")
+    y.benchmark("Data/Benchmarks/phos.csv", "T")
+    del y
+    print("x", par)
+    x = Predictor()
+    x.load_data(file="Data/Training/clean_t.csv")
+    x.generate_random_data(1, amino_acid="T")
+    x.vectorize("sequence")
+    x.balance_data(par)
+    x.supervised_training("mlp_adam")
+    x.benchmark("Data/Benchmarks/phos.csv", "T")
+    print("Done")
+    del x
