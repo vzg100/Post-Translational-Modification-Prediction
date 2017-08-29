@@ -15,7 +15,6 @@ from sklearn.manifold import TSNE
 from imblearn.under_sampling import NearMiss
 from imblearn.under_sampling import NeighbourhoodCleaningRule
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import precision_recall_fscore_support
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
@@ -24,6 +23,47 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import MaxAbsScaler
 import os
 from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
+
+
+def report(results, answers):
+    tp, fp, fn, tn = 0, 0, 0, 0
+    for i in range(len(results)):
+        if results[i] == answers[i]:
+            if results[i] == 1:
+                tp+=1
+            else:
+                tn+=1
+        elif results[i] != answers[i]:
+            if results[i] == 1:
+                fp +=1
+            else:
+                fn+=1
+
+    if tp != 0 and tn != 0:
+        tpr = tp / (tp + fn)  # aka recall aka true positive rate
+        spc = tn / (tn+fp)  # specificty or true negative rate
+        ppv = tp / (tp + fp)  # positive predicative value aka precision
+        npv = tn/(tn+fn)  # negative predictive value
+        fpr = fp/(fp+tn)  # false positive rate aka fallout
+        fnr = fn/(tp+fn)  # false negative rate
+        fdr = fp/(tp+fp)  # false discovery rate
+        acc = (tp + tn) / (tp + fp + tn + fn)
+        roc = roc_auc_score(answers, results)
+        inf = (tpr+spc)-1
+        mkd = (ppv+npv)-1
+        print("Sensitivity:", tpr)
+        print("Specificity :", spc)
+        print("Accuracy:", acc)
+        print("ROC", roc)
+        print("TP", tp, "FP", fp, "TN", tn, "FN", fn)
+        print("\n\n")
+
+    else:
+        print("Failed")
+        print("TP", tp, "FP", fp, "TN", tn, "FN", fn)
+        print("\n\n")
 
 
 def distance(s1: str, s2: str, threshold: float =.9):
@@ -51,15 +91,17 @@ def windower(sequence: str, position: int, wing_size: int):
         return sequence[position - wing_size:position + wing_size]
 
 
-def chemical_vector(temp_window: str):
+def chemical_vector(temp_window: str, trash=["\"", "B", "X", "Z", "U", "X"]):
     """
     This provides a feature vector containing the sequences chemical properties
     Currently this contains hydrophobicity (gravy), aromaticity, and isoelectric point
     Overall this vector does not preform well and can act as a control feature vector
     """
-    temp_window = temp_window.strip("\"")
+    for i in trash:
+        temp_window = temp_window.replace(i, "")
     temp_window = ProteinAnalysis(temp_window)
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
+
 
 # noinspection PyDefaultArgument
 def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, trash=["\"", "B", "X", "Z", "U", "X"]):
@@ -84,6 +126,52 @@ def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, tras
     if hydrophobicity == 1:
         vec.append(ProteinAnalysis(temp_window).gravy())
     return vec
+
+
+def binary_vector(s :str, trash=["\"", "B", "X", "Z", "U", "X"], seq_size: int= 21):
+    for i in trash:
+        s = s.replace(i, "")
+    AMINO_ACID_BINARY_TABLE = {
+        'A': [0, 0, 0, 0, 0],
+        'C': [0, 0, 0, 0, 1],
+        'D': [0, 0, 0, 1, 0],
+        'E': [0, 0, 0, 1, 1],
+        'F': [0, 0, 1, 0, 0],
+        'G': [0, 0, 1, 0, 1],
+        'H': [0, 0, 1, 1, 0],
+        'I': [0, 0, 1, 1, 1],
+        'K': [0, 1, 0, 0, 0],
+        'L': [0, 1, 0, 0, 1],
+        'M': [0, 1, 0, 1, 0],
+        'N': [0, 1, 0, 1, 1],
+        'P': [0, 1, 1, 0, 0],
+        'Q': [0, 1, 1, 0, 1],
+        'R': [0, 1, 1, 1, 1],
+        'S': [1, 0, 0, 0, 0],
+        'T': [1, 0, 0, 0, 1],
+        'V': [1, 0, 0, 1, 0],
+        'W': [1, 0, 0, 1, 1],
+        'Y': [1, 0, 1, 0, 0],
+        'ZZ': [1, 1, 1, 1, 1]
+    }
+    t =  [AMINO_ACID_BINARY_TABLE[i] for i in s]
+    if len(t) < seq_size:
+        for i in range(seq_size-len(t)):
+            t.append(AMINO_ACID_BINARY_TABLE["ZZ"])
+    return t
+
+def find_ngrams(s: str, n, trash=["\"", "B", "X", "Z", "U", "X"]):
+    for i in trash:
+        s = s.replace(i, "")
+    s = [i for i in s]
+    s = [i for i in zip(*[s[i:] for i in range(n)])]
+    ngrams = []
+    for i in s:
+        t = ""
+        for j in i:
+             t+=j
+        ngrams.append(t)
+    return ngrams
 
 
 def hydrophobicity_vector(temp_window: str):
@@ -271,7 +359,7 @@ class Predictor:
         self.words = []
         self.window_size = window_size
         self.supervised_classifiers = {"forest": RandomForestClassifier(n_jobs=4),
-                                       "mlp_adam": MLPClassifier(activation="logistic"),
+                                       "mlp_adam": MLPClassifier( verbose=2),
                                        "svc": svm.SVC()}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
@@ -281,7 +369,7 @@ class Predictor:
         self.pos = pos
         self.random_data = 0
         self.test_results = 0
-        self.vecs = {"sequence": sequence_vector, "chemistry": chemical_vector, "hydrophobicity": hydrophobicity_vector}
+        self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector, "hydrophobicity": hydrophobicity_vector, "binary": binary_vector}
         self.vector = 0
 
     def load_data(self, file, delimit=",", header_line=0):
@@ -298,7 +386,7 @@ class Predictor:
         for i in range(len(data[self.seq])):
             if type(data[self.seq][i]) == str:
                 self.features.append(data[self.seq][i])
-                self.labels.append(data[self.pos][i])
+                self.labels.append(int(data[self.pos][i]))
 
     def generate_random_data(self, ratio, amino_acid):
         """
@@ -353,27 +441,37 @@ class Predictor:
         """
         print("Starting Training")
         self.features = list(self.features)
-        print(len(self.features), len(self.labels))
         self.classifier = self.supervised_classifiers[classy]
         temp = list(zip(self.features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
-                                                                        test_size=0.3, random_state=42)
+        check = 1
+        rand_state = 0
+        while check != 0:
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
+                                                                        test_size=0.1, random_state=check)
+            if 1 in self.y_test and 1 in self.y_train:
+                check = 0
+            else:
+                print("Reshuffling")
+                check+=1
+
         if self.random_data > 0:
             for i in range(len(self.random_seq)):
                 np.append(self.X_train, self.vector(self.random_seq[i]))
                 np.append(self.y_train, 0)
+        print(len(self.X_test), len(self.X_train))
         if scale != -1:
             st = {"standard":StandardScaler(), "robust": RobustScaler(), "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
             self.X_train = st[scale].fit_transform(X=self.X_train)
             self.X_test = st[scale].fit_transform(X=self.X_test)
-
         self.classifier.fit(self.X_train, self.y_train)
         print("Done training")
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
-        print(classification_report(y_pred=self.test_results, y_true=self.y_test, target_names=["Non PTM", "PTM"]))
+        #print(classification_report(y_pred=self.test_results, y_true=self.y_test, target_names=["Non PTM", "PTM"]))
+        #print("Accuracy", accuracy_score(y_true=self.y_test, y_pred=self.test_results))
+        print(report(answers=self.y_test, results=self.test_results))
 
     def benchmark(self, benchmark: str, aa: str):
         benchmark = open(benchmark)
@@ -389,6 +487,7 @@ class Predictor:
             if aa == code:
                 validation.append(self.vector(seq))
                 answer_key.append(int(label))
+
         v = self.classifier.predict(validation)
         v.reshape(len(v), 1)
         answer_key = np.asarray(answer_key)
@@ -402,8 +501,11 @@ class Predictor:
                 print(i, "answer")
             if v[i] != 0 and v[i] != 1:
                 print(i, "V", v[i], type(v[i]))
-        print(precision_recall_fscore_support(v,  answer_key, labels=[1]))
-        print(classification_report(y_pred=v, y_true=answer_key, target_names=["Non PTM", "PTM"]))
+
+        #print(classification_report(y_pred=v, y_true=answer_key, target_names=["Non PTM", "PTM"]))
+        #print("Accuracy:", accuracy_score(y_true=answer_key, y_pred=v))
+        print("Benchmark Results ")
+        print(report(answers=answer_key, results=v))
 
     def generate_pca(self):
         """
@@ -449,4 +551,21 @@ x.generate_positive()
 x.generate_negatives(cross_check=1, amino_acid="H")
 x.write_data("Data/Training/clean_h.csv")
 """
-x = FastaToCSV(negative="Data/Benchmarks/Raw/PKC_neg.fasta", positive="Data/Benchmarks/Raw/PKC_pos.fasta", output="Data/Benchmarks/phos.csv")
+
+y = Predictor()
+y.load_data(file="Data/Training/clean_t.csv")
+#y.generate_random_data(1, amino_acid="Y")
+y.vectorize("sequence")
+#y.balance_data("near_miss")
+y.supervised_training("mlp_adam")
+y.benchmark("Data/Benchmarks/phos.csv", "T")
+del y
+x = Predictor()
+x.load_data(file="Data/Training/clean_t.csv")
+x.generate_random_data(1, amino_acid="T")
+x.vectorize("sequence")
+#x.balance_data("near_miss")
+x.supervised_training("mlp_adam")
+x.benchmark("Data/Benchmarks/phos.csv", "T")
+print("Done")
+del x
