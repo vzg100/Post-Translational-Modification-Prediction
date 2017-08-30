@@ -25,7 +25,7 @@ import os
 from sklearn.metrics import classification_report
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
-
+import time
 
 def report(results, answers):
     tp, fp, fn, tn = 0, 0, 0, 0
@@ -433,12 +433,13 @@ class Predictor:
             self.features, self.labels = imba.fit_sample(self.features, self.labels)
             print("Balanced Data")
 
-    def supervised_training(self, classy: str, scale: str =-1):
+    def supervised_training(self, classy: str, scale: str =-1, breaking_point: int=7200):
         """
         Trains and tests the classifier on the data
         :param classy: Classifier of choice, is string passed through dict
         :param scale: Applies a scaler function from sklearn if not -1
         :return: Classifier trained and ready to go and some results
+        :breaking_point: how many seconds till negative random data samples will stop being generated otherwise takes too long on large data sets
         """
         print("Starting Training")
         self.features = list(self.features)
@@ -446,6 +447,7 @@ class Predictor:
         temp = list(zip(self.features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
+
         check = 1
         rand_state = 0
         while check != 0:
@@ -458,7 +460,13 @@ class Predictor:
                 check+=1
 
         if self.random_data > 0:
+            check_time = time.time()
+            print(time.time())
             for i in range(len(self.random_seq)):
+                if breaking_point == -1:
+                    pass
+                elif time.time() - check_time >= breaking_point:
+                    break
                 np.append(self.X_train, self.vector(self.random_seq[i]))
                 np.append(self.y_train, 0)
         print(len(self.X_test), len(self.X_train))
