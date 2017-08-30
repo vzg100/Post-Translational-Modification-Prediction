@@ -427,7 +427,7 @@ class Predictor:
         :param imbalance_function: imblearn function of choice, it is a string
         :return: balanced data
         """
-        if self.imbalance_functions[imbalance_function] != -1
+        if self.imbalance_functions[imbalance_function] != -1:
             print("Balancing Data")
             imba = self.imbalance_functions[imbalance_function]
             self.features, self.labels = imba.fit_sample(self.features, self.labels)
