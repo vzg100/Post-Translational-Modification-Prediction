@@ -27,6 +27,13 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
 import time
 
+def vectorize(data, vect):
+    t = []
+    for i in data:
+        t.append(vect(i))
+    return t
+
+
 def report(results, answers):
     tp, fp, fn, tn = 0, 0, 0, 0
     for i in range(len(results)):
@@ -344,7 +351,39 @@ class FastaToCSV:
         positive.close()
         output.close()
 
+class DataDict:
+    def __init__(self, file, delimit=",", header_line=0, seq="sequence", pos="label"):
+        self.data = {}
+        self.seq = seq
+        self.pos = pos
+        data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
+        data = data.reindex(np.random.permutation(data.index))
+        for i in range(len(data[self.seq])):
+            if type(data[self.seq][i]) == str:
+                self.data[data[self.seq][i]] = int(data[self.pos][i])
 
+    def out_put(self,):
+        f = []
+        l = []
+        for i in self.data.keys():
+            f.append(i)
+            if self.data[i] == 1:
+                l.append(1)
+            else:
+                l.append(0)
+        return f, l
+    def add_seq(self, seq: str, label: int):
+        try:
+            self.data[seq] = label
+        except:
+            print("Sequence Already Present")
+            pass
+    def check(self, seq: str):
+        try:
+            self.data[seq]
+            return 1
+        except:
+            return -1
 
 # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
 class Predictor:
@@ -371,6 +410,7 @@ class Predictor:
         self.test_results = 0
         self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector, "hydrophobicity": hydrophobicity_vector, "binary": binary_vector}
         self.vector = 0
+        self.features_labels = {}
 
     def load_data(self, file, delimit=",", header_line=0):
         """
@@ -381,59 +421,39 @@ class Predictor:
         :return: Loads the data inot the object
         """
         # Modify these if working with different CSV column names
-        data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
-        self.data = data.reindex(np.random.permutation(data.index))
-        for i in range(len(data[self.seq])):
-            if type(data[self.seq][i]) == str:
-                self.features.append(data[self.seq][i])
-                self.labels.append(int(data[self.pos][i]))
-
-    def generate_random_data(self, ratio, amino_acid):
-        """
-        Must be executed after load_data
-        Adds randomly generated data that is automatically cross checked
-        :param ratio: ratio of random to real data
-        :param amino_acid: amino acid which the ptm is being tested for
-        :return: Adds random data to the generated data
-        """
         print("Loading Data")
-        temp_len = len(self.features)
-        self.random_seq = []
-        self.random_data = 1
-        for i in range(int(ratio*temp_len)):
-            self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size*.5),
-                                                            locked=self.data[self.seq]))
+        self.data = DataDict(file=file, delimit=delimit, header_line=header_line)
         print("Loaded Data")
-
-    def vectorize(self, vectorizer):
-        """
-        Vectorizes the data using a vector function of choice
-        Long term goal is convert this to string input and have an internal dict
-        :param vectorizer: function which will vectorize the data
-        :return: vectorized data
-        """
-        print("Applying Vector Function")
-        t = []
-
-        self.vector = self.vecs[vectorizer]
-        for i in self.features:
-            t.append(self.vector(i))
-        self.features = t
-        print("Finished Applying Vector Function")
-
-    def balance_data(self, imbalance_function):
+    def process_data(self, imbalance_function, amino_acid: str, vector_function: str, random_data = 1,ratio: int=1):
         """
         Applies imblearn function to the data
         :param imbalance_function: imblearn function of choice, it is a string
+        :random data 0 none generate, 1 it is generated
         :return: balanced data
         """
+        print("Working on Data")
+        self.vector = self.vecs[vector_function]
+
+        if random_data != 0:
+            temp_len = len(self.features)
+            self.random_seq = []
+            self.random_data = 1
+            for i in range(int(ratio * temp_len)):
+                self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size * .5),
+                                                           locked=self.data[self.seq]))
+        self.features, self.labels =  self.data.out_put()
+        t = []
+        for i in self.features:
+            t.append(self.vector(i))
+        self.features = t
+        del t
         if self.imbalance_functions[imbalance_function] != -1:
             print("Balancing Data")
             imba = self.imbalance_functions[imbalance_function]
             self.features, self.labels = imba.fit_sample(self.features, self.labels)
             print("Balanced Data")
-
-    def supervised_training(self, classy: str, scale: str =-1, breaking_point: int=7200):
+        print("Finished working with Data")
+    def supervised_training(self, classy: str, scale: str =-1):
         """
         Trains and tests the classifier on the data
         :param classy: Classifier of choice, is string passed through dict
@@ -447,33 +467,31 @@ class Predictor:
         temp = list(zip(self.features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
-
         check = 1
-        rand_state = 0
         while check != 0:
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
                                                                         test_size=0.1, random_state=check)
             if 1 in self.y_test and 1 in self.y_train:
                 check = 0
             else:
-                print("Reshuffling")
+                print("Reshuffling, no positive samples in either y_test or y_train ")
                 check+=1
 
         if self.random_data > 0:
-            check_time = time.time()
-            print(time.time())
-            for i in range(len(self.random_seq)):
-                if breaking_point == -1:
-                    pass
-                elif time.time() - check_time >= breaking_point:
-                    break
-                np.append(self.X_train, self.vector(self.random_seq[i]))
-                np.append(self.y_train, 0)
+            print("Filtering Random Data")
+            for i in self.random_seq:
+                if self.data.check(i) == 1:
+                    np.append(self.X_train, self.vector(i))
+                    np.append(self.y_train, 0)
+            print("Finished with Random Data")
         print(len(self.X_test), len(self.X_train))
         if scale != -1:
+            print("Scaling Data")
             st = {"standard":StandardScaler(), "robust": RobustScaler(), "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
             self.X_train = st[scale].fit_transform(X=self.X_train)
             self.X_test = st[scale].fit_transform(X=self.X_test)
+            print("Finished Scaling Data")
+        print("Starting Training")
         self.classifier.fit(self.X_train, self.y_train)
         print("Done training")
         self.test_results = self.classifier.predict(self.X_test)
@@ -560,20 +578,8 @@ par = ["pass", "ADASYN", "SMOTEENN", "random_under_sample", "ncl", "near_miss"]
 for i in par:
     print("y", i)
     y = Predictor()
-    y.load_data(file="Data/Training/clean_t.csv")
-    #y.generate_random_data(1, amino_acid="Y")
-    y.vectorize("sequence")
-    y.balance_data(i)
+    y.load_data(file="Data/Training/clean_S.csv")
+    y.process_data(vector_function="sequence", amino_acid="S", imbalance_function=i, random_data=1)
     y.supervised_training("mlp_adam")
-    y.benchmark("Data/Benchmarks/phos.csv", "T")
+    y.benchmark("Data/Benchmarks/phos.csv", "S")
     del y
-    print("x", i)
-    x = Predictor()
-    x.load_data(file="Data/Training/clean_t.csv")
-    x.generate_random_data(1, amino_acid="T")
-    x.vectorize("sequence")
-    x.balance_data(i)
-    x.supervised_training("mlp_adam")
-    x.benchmark("Data/Benchmarks/phos.csv", "T")
-    print("Done")
-    del x
