@@ -398,7 +398,7 @@ class Predictor:
         self.words = []
         self.window_size = window_size
         self.supervised_classifiers = {"forest": RandomForestClassifier(n_jobs=4),
-                                       "mlp_adam": MLPClassifier( verbose=2),
+                                       "mlp_adam": MLPClassifier(),
                                        "svc": svm.SVC()}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
@@ -431,10 +431,11 @@ class Predictor:
         :random data 0 none generate, 1 it is generated
         :return: balanced data
         """
+        self.random_data = random_data
         print("Working on Data")
         self.vector = self.vecs[vector_function]
 
-        if random_data != 0:
+        if self.random_data != 0:
             temp_len = len(self.features)
             self.random_seq = []
             self.random_data = 1
@@ -579,7 +580,14 @@ for i in par:
     print("y", i)
     y = Predictor()
     y.load_data(file="Data/Training/clean_S.csv")
-    y.process_data(vector_function="sequence", amino_acid="S", imbalance_function=i, random_data=1)
+    y.process_data(vector_function="sequence", amino_acid="S", imbalance_function=i, random_data=0)
     y.supervised_training("mlp_adam")
     y.benchmark("Data/Benchmarks/phos.csv", "S")
     del y
+    print("x", i)
+    x = Predictor()
+    x.load_data(file="Data/Training/clean_S.csv")
+    x.process_data(vector_function="sequence", amino_acid="S", imbalance_function=i, random_data=1)
+    x.supervised_training("mlp_adam")
+    x.benchmark("Data/Benchmarks/phos.csv", "S")
+    del x
