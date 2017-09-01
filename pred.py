@@ -485,7 +485,7 @@ class Predictor:
                 if self.data.check(i) == 1:
                     self.X_train.append(self.vector(i))
                     self.y_train.append(0)
-                    c+=0
+                    c+=1
             self.X_train = np.asarray(self.X_train)
             self.y_train = np.asarray(self.y_train)
             print("Random Data Added:", c)
