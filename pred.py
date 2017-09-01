@@ -190,7 +190,7 @@ def hydrophobicity_vector(temp_window: str):
     return [temp_window.gravy()]
 
 
-def generate_random_seq(locked: list, wing_size: int, center: str):
+def generate_random_seq(wing_size: int, center: str):
     """
     Generates random sequences and checks that they aren't in locked
     Locked is a list of sequences which are known to be positives
@@ -201,10 +201,8 @@ def generate_random_seq(locked: list, wing_size: int, center: str):
         t1 += amino_acids[randint(0, 19)]
         t2 += amino_acids[randint(0, 19)]
     final_seq = t1 + center + t2
-    if final_seq not in locked:
-        return final_seq
-    else:
-        generate_random_seq(locked, wing_size, center)
+
+    return final_seq
 
 
 class DataCleaner:
@@ -379,10 +377,9 @@ class DataDict:
             print("Sequence Already Present")
             pass
     def check(self, seq: str):
-        try:
-            self.data[seq]
+        if seq not in self.data.keys():
             return 1
-        except:
+        else:
             return -1
 
 # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
@@ -434,15 +431,11 @@ class Predictor:
         self.random_data = random_data
         print("Working on Data")
         self.vector = self.vecs[vector_function]
-
-        if self.random_data != 0:
-            temp_len = len(self.features)
+        self.features, self.labels = self.data.out_put()
+        if self.random_data == 1:
             self.random_seq = []
-            self.random_data = 1
-            for i in range(int(ratio * temp_len)):
-                self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size * .5),
-                                                           locked=self.data[self.seq]))
-        self.features, self.labels =  self.data.out_put()
+            for i in range(int(ratio * len(self.features))):
+                self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size * .5)))
         t = []
         for i in self.features:
             t.append(self.vector(i))
@@ -454,7 +447,7 @@ class Predictor:
             self.features, self.labels = imba.fit_sample(self.features, self.labels)
             print("Balanced Data")
         print("Finished working with Data")
-    def supervised_training(self, classy: str, scale: str =-1):
+    def supervised_training(self, classy: str, scale: str =-1, break_point: int = 3200):
         """
         Trains and tests the classifier on the data
         :param classy: Classifier of choice, is string passed through dict
@@ -462,7 +455,6 @@ class Predictor:
         :return: Classifier trained and ready to go and some results
         :breaking_point: how many seconds till negative random data samples will stop being generated otherwise takes too long on large data sets
         """
-        print("Starting Training")
         self.features = list(self.features)
         self.classifier = self.supervised_classifiers[classy]
         temp = list(zip(self.features, self.labels))
@@ -477,15 +469,29 @@ class Predictor:
             else:
                 print("Reshuffling, no positive samples in either y_test or y_train ")
                 check+=1
-
-        if self.random_data > 0:
+        c = 0
+        if self.random_data == 1:
+            t = time.time()
+            print("Random Sequences Generated", len(self.random_seq))
             print("Filtering Random Data")
+            self.X_train = list(self.X_train)
+            self.y_train = list(self.y_train)
             for i in self.random_seq:
+                if break_point == -1:
+                    pass
+                elif time.time() - t > break_point:
+                    print("Timing out Random Data incorperation into test Data")
+                    break
                 if self.data.check(i) == 1:
-                    np.append(self.X_train, self.vector(i))
-                    np.append(self.y_train, 0)
+                    self.X_train.append(self.vector(i))
+                    self.y_train.append(0)
+                    c+=0
+            self.X_train = np.asarray(self.X_train)
+            self.y_train = np.asarray(self.y_train)
+            print("Random Data Added:", c)
             print("Finished with Random Data")
-        print(len(self.X_test), len(self.X_train))
+        print("Training Data Points:",len(self.X_train) )
+        print("Test Data Points:", len(self.X_test))
         if scale != -1:
             print("Scaling Data")
             st = {"standard":StandardScaler(), "robust": RobustScaler(), "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
@@ -567,27 +573,3 @@ class Predictor:
         for i in s:
             t.append(self.vector(i))
         return self.classifier.predict(t)
-
-"""
-x = DataCleaner("/Users/mark/PycharmProjects/phosphosites.csv")
-x.load_data(amino_acid="H")
-x.generate_positive()
-x.generate_negatives(cross_check=1, amino_acid="H")
-x.write_data("Data/Training/clean_h.csv")
-"""
-par = ["pass", "ADASYN", "SMOTEENN", "random_under_sample", "ncl", "near_miss"]
-for i in par:
-    print("y", i)
-    y = Predictor()
-    y.load_data(file="Data/Training/clean_S.csv")
-    y.process_data(vector_function="sequence", amino_acid="S", imbalance_function=i, random_data=0)
-    y.supervised_training("mlp_adam")
-    y.benchmark("Data/Benchmarks/phos.csv", "S")
-    del y
-    print("x", i)
-    x = Predictor()
-    x.load_data(file="Data/Training/clean_S.csv")
-    x.process_data(vector_function="sequence", amino_acid="S", imbalance_function=i, random_data=1)
-    x.supervised_training("mlp_adam")
-    x.benchmark("Data/Benchmarks/phos.csv", "S")
-    del x
