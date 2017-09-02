@@ -22,8 +22,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import MaxAbsScaler
 import os
-from sklearn.metrics import classification_report
-from sklearn.metrics import accuracy_score
+import zipfile
 from sklearn.metrics import roc_auc_score
 import time
 
@@ -223,7 +222,10 @@ class DataCleaner:
         :param wing: how long the seq is on either side of the modified amino acid
         For example wing size of 2 on X would be AAXAA
         """
-        self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
+        if ".zip" in file:
+            self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object, compression="zip")
+        else:
+            self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.protiens = {}
         self.count = 0
         self.labels = []
@@ -519,11 +521,13 @@ class Predictor:
             if aa == code:
                 validation.append(self.vector(seq))
                 answer_key.append(int(label))
-
+        validation = np.asarray(validation)
+        print(validation)
         v = self.classifier.predict(validation)
         v.reshape(len(v), 1)
         answer_key = np.asarray(answer_key)
         answer_key.reshape(len(answer_key), 1)
+
         t= []
         for i in v:
             t.append(int(i))
