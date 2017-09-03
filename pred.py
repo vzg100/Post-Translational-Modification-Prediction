@@ -511,19 +511,18 @@ class Predictor:
         benchmark = open(benchmark)
         validation = []
         answer_key = []
-        for i in benchmark:
 
+        for i in benchmark:
             s = i.split(",")
             label = s[1].replace("\n", "").replace("\t", "")
             seq = s[0].replace("\n", "").replace("\t", "")
             code = s[2].replace("\n", "").replace("\t", "")
-
+  
             if aa == code:
                 validation.append(self.vector(seq))
                 answer_key.append(int(label))
-        validation = np.asarray(validation)
-        print(validation)
-        v = self.classifier.predict(validation)
+        print("Number of data points in benchmark", len(validation))
+        v = self.classifier.predict(np.asarray(validation))
         v.reshape(len(v), 1)
         answer_key = np.asarray(answer_key)
         answer_key.reshape(len(answer_key), 1)
