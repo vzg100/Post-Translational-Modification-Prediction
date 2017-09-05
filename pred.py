@@ -22,15 +22,16 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import MaxAbsScaler
 import os
-import zipfile
 from sklearn.metrics import roc_auc_score
 import time
 
-def vectorize(data, vect):
-    t = []
-    for i in data:
-        t.append(vect(i))
-    return t
+trash = ["\"", "B", "X", "Z", "U", "X"]
+
+
+def clean(seq: str, t: list = trash):
+    for i in t:
+        seq.replace(i, "")
+    return seq
 
 
 def report(results, answers):
@@ -38,27 +39,20 @@ def report(results, answers):
     for i in range(len(results)):
         if results[i] == answers[i]:
             if results[i] == 1:
-                tp+=1
+                tp += 1
             else:
-                tn+=1
+                tn += 1
         elif results[i] != answers[i]:
             if results[i] == 1:
-                fp +=1
+                fp += 1
             else:
-                fn+=1
+                fn += 1
 
     if tp != 0 and tn != 0:
         tpr = tp / (tp + fn)  # aka recall aka true positive rate
         spc = tn / (tn+fp)  # specificty or true negative rate
-        ppv = tp / (tp + fp)  # positive predicative value aka precision
-        npv = tn/(tn+fn)  # negative predictive value
-        fpr = fp/(fp+tn)  # false positive rate aka fallout
-        fnr = fn/(tp+fn)  # false negative rate
-        fdr = fp/(tp+fp)  # false discovery rate
         acc = (tp + tn) / (tp + fp + tn + fn)
         roc = roc_auc_score(answers, results)
-        inf = (tpr+spc)-1
-        mkd = (ppv+npv)-1
         print("Sensitivity:", tpr)
         print("Specificity :", spc)
         print("Accuracy:", acc)
@@ -77,7 +71,7 @@ def distance(s1: str, s2: str, threshold: float =.9):
     for i in range(len(s1)):
         if s1[i] != s2[i]:
             t += 1
-    if (len(s1)-t) / s2 < threshold:
+    if ((len(s1)-t) / len(s2)) < threshold:
         return False
     else:
         return True
@@ -97,7 +91,7 @@ def windower(sequence: str, position: int, wing_size: int):
         return sequence[position - wing_size:position + wing_size]
 
 
-def chemical_vector(temp_window: str, trash=["\"", "B", "X", "Z", "U", "X"]):
+def chemical_vector(temp_window: str):
     """
     This provides a feature vector containing the sequences chemical properties
     Currently this contains hydrophobicity (gravy), aromaticity, and isoelectric point
@@ -105,19 +99,18 @@ def chemical_vector(temp_window: str, trash=["\"", "B", "X", "Z", "U", "X"]):
     """
     for i in trash:
         temp_window = temp_window.replace(i, "")
-    temp_window = ProteinAnalysis(temp_window)
+    temp_window = ProteinAnalysis(clean(temp_window))
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
 
 
 # noinspection PyDefaultArgument
-def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, trash=["\"", "B", "X", "Z", "U", "X"]):
+def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1):
     """
     This vector takes the sequence and has each amino acid represented by an int
     0 represents nonstandard amino acids or as fluff for tails/heads of sequences
     Strip is a list which can be modified as user needs call for
     """
-    for i in trash:
-        temp_window = temp_window.replace(i, "")
+    temp_window = clean(temp_window)
     vec = []
     aa = {"G": 1, "A": 2, "L": 3, "M": 4, "F": 5, "W": 6, "K": 7, "Q": 8, "E": 9, "S": 10, "P": 11, "V": 12, "I": 13,
           "C": 14, "Y": 15, "H": 16, "R": 17, "N": 18, "D": 19, "T": 20, "X": 0}
@@ -125,7 +118,7 @@ def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, tras
     for i in temp_window:
         vec.append(aa[i])
     if len(vec) != seq_size:
-        t=len(vec)
+        t = len(vec)
         for i in range(seq_size-t):
             vec.append(0)
     # Hydrophobicity is optional
@@ -134,10 +127,9 @@ def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1, tras
     return vec
 
 
-def binary_vector(s :str, trash=["\"", "B", "X", "Z", "U", "X"], seq_size: int= 21):
-    for i in trash:
-        s = s.replace(i, "")
-    AMINO_ACID_BINARY_TABLE = {
+def binary_vector(s: str, seq_size: int = 21):
+    s = clean(s)
+    aa_binary = {
         'A': [0, 0, 0, 0, 0],
         'C': [0, 0, 0, 0, 1],
         'D': [0, 0, 0, 1, 0],
@@ -160,22 +152,22 @@ def binary_vector(s :str, trash=["\"", "B", "X", "Z", "U", "X"], seq_size: int= 
         'Y': [1, 0, 1, 0, 0],
         'ZZ': [1, 1, 1, 1, 1]
     }
-    t =  [AMINO_ACID_BINARY_TABLE[i] for i in s]
+    t = [aa_binary[i] for i in s]
     if len(t) < seq_size:
         for i in range(seq_size-len(t)):
-            t.append(AMINO_ACID_BINARY_TABLE["ZZ"])
+            t.append(aa_binary["ZZ"])
     return t
 
-def find_ngrams(s: str, n, trash=["\"", "B", "X", "Z", "U", "X"]):
-    for i in trash:
-        s = s.replace(i, "")
+
+def find_ngrams(s: str, n):
+    s = clean(s)
     s = [i for i in s]
     s = [i for i in zip(*[s[i:] for i in range(n)])]
     ngrams = []
     for i in s:
         t = ""
         for j in i:
-             t+=j
+            t += j
         ngrams.append(t)
     return ngrams
 
@@ -184,7 +176,7 @@ def hydrophobicity_vector(temp_window: str):
     """
     Just returns the hydrophobicity as a feature, another control vector
     """
-    temp_window = temp_window.strip("\"")
+    temp_window = clean(temp_window)
     temp_window = ProteinAnalysis(temp_window)
     return [temp_window.gravy()]
 
@@ -208,7 +200,7 @@ class DataCleaner:
     """
     Cleans up data from various csvs with different organizational preferences
     Assumes column names are sequence, code, and position
-    Enables the user to generate negative examples, sequences which aren't in the known positives are assumed to negative
+    Enables the user to generate negative examples, sequences which aren't explicit positives are assumed to negative
     I chose to make the DataCleaner require extra steps to run since I am assuming people using it come from a
     non CS background and
     the extra steps are meant to enable easier debugging and understanding of the flow
@@ -222,10 +214,8 @@ class DataCleaner:
         :param wing: how long the seq is on either side of the modified amino acid
         For example wing size of 2 on X would be AAXAA
         """
-        if ".zip" in file:
-            self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object, compression="zip")
-        else:
-            self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
+
+        self.data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
         self.protiens = {}
         self.count = 0
         self.labels = []
@@ -351,6 +341,7 @@ class FastaToCSV:
         positive.close()
         output.close()
 
+
 class DataDict:
     def __init__(self, file, delimit=",", header_line=0, seq="sequence", pos="label"):
         self.data = {}
@@ -372,17 +363,20 @@ class DataDict:
             else:
                 l.append(0)
         return f, l
+
     def add_seq(self, seq: str, label: int):
         try:
             self.data[seq] = label
         except:
             print("Sequence Already Present")
             pass
+
     def check(self, seq: str):
         if seq not in self.data.keys():
             return 1
         else:
             return -1
+
 
 # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
 class Predictor:
@@ -402,12 +396,13 @@ class Predictor:
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
-                                    "near_miss": NearMiss(), "pass":-1}
+                                    "near_miss": NearMiss(), "pass": -1}
         self.seq = seq
         self.pos = pos
         self.random_data = 0
         self.test_results = 0
-        self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector, "hydrophobicity": hydrophobicity_vector, "binary": binary_vector}
+        self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector,
+                     "hydrophobicity": hydrophobicity_vector, "binary": binary_vector}
         self.vector = 0
         self.features_labels = {}
 
@@ -423,12 +418,16 @@ class Predictor:
         print("Loading Data")
         self.data = DataDict(file=file, delimit=delimit, header_line=header_line)
         print("Loaded Data")
-    def process_data(self, imbalance_function, amino_acid: str, vector_function: str, random_data = 1,ratio: int=1):
+
+    def process_data(self, imbalance_function, amino_acid: str, vector_function: str, random_data=1, ratio: int=1):
         """
-        Applies imblearn function to the data
-        :param imbalance_function: imblearn function of choice, it is a string
-        :random data 0 none generate, 1 it is generated
-        :return: balanced data
+        Handles much of the data processing
+        :param imbalance_function: str which is passed through dict to apply imbalanced functions to the data
+        :param amino_acid: Amino acid of focus TODO: move to init
+        :param vector_function: Function under which data is vectorized
+        :param random_data: Flag on whether to use random data, by default selected
+        :param ratio: desired ratio of random data to real data
+        :return:
         """
         self.random_data = random_data
         print("Working on Data")
@@ -449,13 +448,14 @@ class Predictor:
             self.features, self.labels = imba.fit_sample(self.features, self.labels)
             print("Balanced Data")
         print("Finished working with Data")
+
     def supervised_training(self, classy: str, scale: str =-1, break_point: int = 3200):
         """
         Trains and tests the classifier on the data
         :param classy: Classifier of choice, is string passed through dict
         :param scale: Applies a scaler function from sklearn if not -1
+        :param break_point: how many seconds till negative random data samples will stop being generated
         :return: Classifier trained and ready to go and some results
-        :breaking_point: how many seconds till negative random data samples will stop being generated otherwise takes too long on large data sets
         """
         self.features = list(self.features)
         self.classifier = self.supervised_classifiers[classy]
@@ -465,12 +465,12 @@ class Predictor:
         check = 1
         while check != 0:
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
-                                                                        test_size=0.1, random_state=check)
+                                                                                    test_size=0.1, random_state=check)
             if 1 in self.y_test and 1 in self.y_train:
                 check = 0
             else:
                 print("Reshuffling, no positive samples in either y_test or y_train ")
-                check+=1
+                check += 1
         c = 0
         if self.random_data == 1:
             t = time.time()
@@ -487,16 +487,17 @@ class Predictor:
                 if self.data.check(i) == 1:
                     self.X_train.append(self.vector(i))
                     self.y_train.append(0)
-                    c+=1
+                    c += 1
             self.X_train = np.asarray(self.X_train)
             self.y_train = np.asarray(self.y_train)
             print("Random Data Added:", c)
             print("Finished with Random Data")
-        print("Training Data Points:",len(self.X_train) )
+        print("Training Data Points:", len(self.X_train))
         print("Test Data Points:", len(self.X_test))
         if scale != -1:
             print("Scaling Data")
-            st = {"standard":StandardScaler(), "robust": RobustScaler(), "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
+            st = {"standard": StandardScaler(), "robust": RobustScaler(),
+                  "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
             self.X_train = st[scale].fit_transform(X=self.X_train)
             self.X_test = st[scale].fit_transform(X=self.X_test)
             print("Finished Scaling Data")
@@ -517,7 +518,7 @@ class Predictor:
             label = s[1].replace("\n", "").replace("\t", "")
             seq = s[0].replace("\n", "").replace("\t", "")
             code = s[2].replace("\n", "").replace("\t", "")
-  
+
             if aa == code:
                 validation.append(self.vector(seq))
                 answer_key.append(int(label))
@@ -527,7 +528,7 @@ class Predictor:
         answer_key = np.asarray(answer_key)
         answer_key.reshape(len(answer_key), 1)
 
-        t= []
+        t = []
         for i in v:
             t.append(int(i))
         v = np.asarray(t).reshape(len(t), 1)
@@ -568,7 +569,7 @@ class Predictor:
         plt.show()
 
     def test_seq(self, s: str):
-        s= self.vector(s)
+        s = self.vector(s)
         return self.classifier.predict(s)
 
     def test_sequences(self, s: list):
