@@ -402,7 +402,7 @@ class Predictor:
         self.random_data = 0
         self.test_results = 0
         self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector,
-                     "hydrophobicity": hydrophobicity_vector, "binary": binary_vector}
+                     "hydrophobicity": hydrophobicity_vector, "binary": binary_vector, "w2v":"w2v"}
         self.vector = 0
         self.features_labels = {}
 
