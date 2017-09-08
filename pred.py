@@ -30,7 +30,7 @@ trash = ["\"", "B", "X", "Z", "U", "X"]
 
 def clean(seq: str, t: list = trash):
     for i in t:
-        seq.replace(i, "")
+        seq = seq.replace(i, "")
     return seq
 
 
@@ -97,8 +97,7 @@ def chemical_vector(temp_window: str):
     Currently this contains hydrophobicity (gravy), aromaticity, and isoelectric point
     Overall this vector does not preform well and can act as a control feature vector
     """
-    for i in trash:
-        temp_window = temp_window.replace(i, "")
+    temp_window = clean(temp_window)
     temp_window = ProteinAnalysis(clean(temp_window))
     return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
 
@@ -111,6 +110,7 @@ def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1):
     Strip is a list which can be modified as user needs call for
     """
     temp_window = clean(temp_window)
+
     vec = []
     aa = {"G": 1, "A": 2, "L": 3, "M": 4, "F": 5, "W": 6, "K": 7, "Q": 8, "E": 9, "S": 10, "P": 11, "V": 12, "I": 13,
           "C": 14, "Y": 15, "H": 16, "R": 17, "N": 18, "D": 19, "T": 20, "X": 0}
