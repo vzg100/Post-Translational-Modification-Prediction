@@ -99,11 +99,12 @@ def chemical_vector(temp_window: str):
     """
     temp_window = clean(temp_window)
     temp_window = ProteinAnalysis(clean(temp_window))
-    return [temp_window.gravy(), temp_window.aromaticity(), temp_window.isoelectric_point()]
+    return [temp_window.gravy(), temp_window.aromaticity(),
+            temp_window.isoelectric_point(), temp_window.instability_index()]
 
 
 # noinspection PyDefaultArgument
-def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1):
+def sequence_vector(temp_window: str, seq_size: int = 21, chemical=1):
     """
     This vector takes the sequence and has each amino acid represented by an int
     0 represents nonstandard amino acids or as fluff for tails/heads of sequences
@@ -122,8 +123,12 @@ def sequence_vector(temp_window: str, seq_size: int = 21, hydrophobicity=1):
         for i in range(seq_size-t):
             vec.append(0)
     # Hydrophobicity is optional
-    if hydrophobicity == 1:
-        vec.append(ProteinAnalysis(temp_window).gravy())
+    if chemical == 1:
+        s = ProteinAnalysis(temp_window)
+        vec.append(s.gravy())
+        vec.append(s.instability_index())
+        vec.append(s.aromaticity())
+
     return vec
 
 
@@ -170,15 +175,6 @@ def find_ngrams(s: str, n):
             t += j
         ngrams.append(t)
     return ngrams
-
-
-def hydrophobicity_vector(temp_window: str):
-    """
-    Just returns the hydrophobicity as a feature, another control vector
-    """
-    temp_window = clean(temp_window)
-    temp_window = ProteinAnalysis(temp_window)
-    return [temp_window.gravy()]
 
 
 def generate_random_seq(wing_size: int, center: str):
@@ -401,8 +397,7 @@ class Predictor:
         self.pos = pos
         self.random_data = 0
         self.test_results = 0
-        self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector,
-                     "hydrophobicity": hydrophobicity_vector, "binary": binary_vector, "w2v":"w2v"}
+        self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector, "binary": binary_vector, "w2v": "w2v"}
         self.vector = 0
         self.features_labels = {}
 
