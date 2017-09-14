@@ -432,11 +432,12 @@ class Predictor:
             self.random_seq = []
             for i in range(int(ratio * len(self.features))):
                 self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size * .5)))
-        t = []
-        for i in self.features:
-            t.append(self.vector(i))
-        self.features = t
-        del t
+        self.features = list(map(self.vector, self.features))
+        self.features = list(self.features)
+        self.classifier = self.supervised_classifiers[classy]
+        temp = list(zip(self.features, self.labels))
+        random.shuffle(temp)
+        self.features, self.labels = zip(*temp)
         if self.imbalance_functions[imbalance_function] != -1:
             print("Balancing Data")
             imba = self.imbalance_functions[imbalance_function]
@@ -452,11 +453,7 @@ class Predictor:
         :param break_point: how many seconds till negative random data samples will stop being generated
         :return: Classifier trained and ready to go and some results
         """
-        self.features = list(self.features)
-        self.classifier = self.supervised_classifiers[classy]
-        temp = list(zip(self.features, self.labels))
-        random.shuffle(temp)
-        self.features, self.labels = zip(*temp)
+        self.scale = scale
         check = 1
         while check != 0:
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
