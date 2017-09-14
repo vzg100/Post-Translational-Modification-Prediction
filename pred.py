@@ -388,7 +388,7 @@ class Predictor:
         self.window_size = window_size
         self.supervised_classifiers = {"forest": RandomForestClassifier(n_jobs=4),
                                        "mlp_adam": MLPClassifier(),
-                                       "svc": svm.SVC()}
+                                       "svc": svm.SVC(verbose=1)}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
@@ -434,7 +434,7 @@ class Predictor:
                 self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size * .5)))
         self.features = list(map(self.vector, self.features))
         self.features = list(self.features)
-        self.classifier = self.supervised_classifiers[classy]
+
         temp = list(zip(self.features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
@@ -453,6 +453,7 @@ class Predictor:
         :param break_point: how many seconds till negative random data samples will stop being generated
         :return: Classifier trained and ready to go and some results
         """
+        self.classifier = self.supervised_classifiers[classy]
         self.scale = scale
         check = 1
         while check != 0:
