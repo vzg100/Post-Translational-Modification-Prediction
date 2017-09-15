@@ -230,8 +230,8 @@ class DataCleaner:
         """
         for i in range(len(self.data[seq])):
             if self.data[aa][i] in amino_acid:
+                t = self.data[seq][i]
                 try:
-                    t = self.data[seq][i]
                     if t not in self.protiens.keys():
                         self.protiens[t] = [int(self.data[pos][i])]
                     else:
@@ -239,17 +239,25 @@ class DataCleaner:
                 except:
                     pass
 
-    def generate_positive(self):
+    def generate_positive(self, window=1):
         """
         Populates the object with the positive PTM sequences, clips them down to the intended size
         :return: Populates the object with the positive PTM sequences
         """
+
         for i in self.protiens.keys():
             try:
                 t = self.protiens[i]
                 for j in t:
-                    self.sequences.append(windower(sequence=i, position=j-1, wing_size=self.wing))
-                    self.labels.append(1)
+                    if window == 1:
+                        self.sequences.append(windower(sequence=i, position=j-1, wing_size=self.wing))
+                        self.labels.append(1)
+                    else:
+                        try:
+                            self.sequences.append(i)
+                            self.labels.append(1)
+                        except:
+                            pass
             except:
                 pass
 
@@ -343,7 +351,7 @@ class DataDict:
         self.data = {}
         self.seq = seq
         self.pos = pos
-        data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object)
+        data = pd.read_csv(file, header=header_line, delimiter=delimit, quoting=3, dtype=object, error_bad_lines=False)
         data = data.reindex(np.random.permutation(data.index))
         for i in range(len(data[self.seq])):
             if type(data[self.seq][i]) == str:
