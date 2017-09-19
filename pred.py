@@ -24,6 +24,8 @@ from sklearn.preprocessing import MaxAbsScaler
 import os
 from sklearn.metrics import roc_auc_score
 import time
+from xgboost import XGBClassifier
+from sklearn.model_selection import cross_val_score
 
 trash = ["\"", "B", "X", "Z", "U", "X"]
 
@@ -396,7 +398,8 @@ class Predictor:
         self.window_size = window_size
         self.supervised_classifiers = {"forest": RandomForestClassifier(n_jobs=4),
                                        "mlp_adam": MLPClassifier(),
-                                       "svc": svm.SVC(verbose=1)}
+                                       "svc": svm.SVC(verbose=1),
+                                       "xgb": XGBClassifier(subsample=.5, max_delta_step=5)}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
@@ -503,11 +506,15 @@ class Predictor:
             self.X_test = st[scale].fit_transform(X=self.X_test)
             print("Finished Scaling Data")
         print("Starting Training")
+        self.X_train = np.asarray(self.X_train)
+        self.y_train = np.asarray(self.y_train)
         self.classifier.fit(self.X_train, self.y_train)
         print("Done training")
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
         print(report(answers=self.y_test, results=self.test_results))
+        print("Cross: Validation:", cross_val_score(self.classifier, np.asarray(self.features),
+                                                    np.asarray(self.labels), cv=5))
 
     def benchmark(self, benchmark: str, aa: str):
         benchmark = open(benchmark)
