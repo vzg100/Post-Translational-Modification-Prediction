@@ -399,7 +399,7 @@ class Predictor:
         self.supervised_classifiers = {"forest": RandomForestClassifier(n_jobs=4),
                                        "mlp_adam": MLPClassifier(),
                                        "svc": svm.SVC(verbose=1),
-                                       "xgb": XGBClassifier(subsample=.5, max_delta_step=5)}
+                                       "xgb": XGBClassifier(max_delta_step=5)}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
