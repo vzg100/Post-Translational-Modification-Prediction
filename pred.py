@@ -24,8 +24,11 @@ from sklearn.preprocessing import MaxAbsScaler
 import os
 from sklearn.metrics import roc_auc_score
 import time
+from gensim.models import word2vec
 from xgboost import XGBClassifier
 from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import BaggingClassifier
+from sklearn.cluster import KMeans
 
 trash = ["\"", "B", "X", "Z", "U", "X"]
 
@@ -132,7 +135,6 @@ def sequence_vector(temp_window: str, seq_size: int = 21, chemical=1):
         vec.append(s.aromaticity())
 
     return vec
-
 
 def binary_vector(s: str, seq_size: int = 21):
     s = clean(s)
@@ -321,6 +323,19 @@ class DataCleaner:
         for i in range(len(self.sequences)):
             file.write(str(self.sequences[i]) + "," + str(self.labels[i]) + "\n")
 
+    def generate_corpus(self, num_features: int=300, min_word_count: int=1, num_workers: int=4, downsampling=1e-3, context=10):
+        self.words = []
+        for i in self.protiens.keys():
+            self.words.append(i.split())
+        num_features = num_features  # Word vector dimensionality
+        min_word_count = min_word_count  # Minimum word count
+        num_workers = num_workers  # Number of threads to run in parallel
+        context =context  # Context window size
+        downsampling = downsampling
+        self.model = word2vec.Word2Vec(self.words, workers=num_workers, size=num_features, min_count = min_word_count,
+                                       window = context, sample = downsampling)
+        self.model.init_sims(replace=True)
+
 
 class FastaToCSV:
     # More Benchmarks
@@ -399,7 +414,8 @@ class Predictor:
         self.supervised_classifiers = {"forest": RandomForestClassifier(n_jobs=4),
                                        "mlp_adam": MLPClassifier(),
                                        "svc": svm.SVC(verbose=1),
-                                       "xgb": XGBClassifier(max_delta_step=5)}
+                                       "xgb": XGBClassifier(max_delta_step=5),
+                                       "bagging": BaggingClassifier()}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
@@ -456,7 +472,7 @@ class Predictor:
             print("Balanced Data")
         print("Finished working with Data")
 
-    def supervised_training(self, classy: str, scale: str =-1, break_point: int = 3200):
+    def supervised_training(self, classy: str, scale: str =-1, break_point: int = 3200, test_size=.2):
         """
         Trains and tests the classifier on the data
         :param classy: Classifier of choice, is string passed through dict
@@ -466,10 +482,10 @@ class Predictor:
         """
         self.classifier = self.supervised_classifiers[classy]
         self.scale = scale
-        check = 1
+        check = 12
         while check != 0:
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
-                                                                                    test_size=0.1, random_state=check)
+                                                                                    test_size=0.2, random_state=check)
             if 1 in self.y_test and 1 in self.y_train:
                 check = 0
             else:
@@ -498,7 +514,7 @@ class Predictor:
             print("Finished with Random Data")
         print("Training Data Points:", len(self.X_train))
         print("Test Data Points:", len(self.X_test))
-        if scale != -1:
+        if self.scale != -1:
             print("Scaling Data")
             st = {"standard": StandardScaler(), "robust": RobustScaler(),
                   "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
@@ -516,7 +532,8 @@ class Predictor:
         print("Cross: Validation:", cross_val_score(self.classifier, np.asarray(self.features),
                                                     np.asarray(self.labels), cv=5))
 
-    def benchmark(self, benchmark: str, aa: str):
+    def benchmark(self, benchmark: str, aa: str, scale = -1):
+
         benchmark = open(benchmark)
         validation = []
         answer_key = []
@@ -531,6 +548,12 @@ class Predictor:
                 validation.append(self.vector(seq))
                 answer_key.append(int(label))
         print("Number of data points in benchmark", len(validation))
+        validation = np.asarray(validation)
+        if self.scale != -1:
+            print("Scaling Data")
+            st = {"standard": StandardScaler(), "robust": RobustScaler(),
+                  "minmax": MinMaxScaler(), "max": MaxAbsScaler()}
+            validation = st[self.scale].fit_transform(X=validation)
         v = self.classifier.predict(np.asarray(validation))
         v.reshape(len(v), 1)
         answer_key = np.asarray(answer_key)
