@@ -192,7 +192,6 @@ def generate_random_seq(wing_size: int, center: str):
         t1 += amino_acids[randint(0, 19)]
         t2 += amino_acids[randint(0, 19)]
     final_seq = t1 + center + t2
-
     return final_seq
 
 
@@ -441,7 +440,7 @@ class Predictor:
         self.data = DataDict(file=file, delimit=delimit, header_line=header_line)
         print("Loaded Data")
 
-    def process_data(self, imbalance_function, amino_acid: str, vector_function: str, random_data=1, ratio: int=1):
+    def process_data(self, imbalance_function, amino_acid: str, vector_function: str, random_data=-1, ratio: int=1):
         """
         Handles much of the data processing
         :param imbalance_function: str which is passed through dict to apply imbalanced functions to the data
@@ -459,6 +458,14 @@ class Predictor:
             self.random_seq = []
             for i in range(int(ratio * len(self.features))):
                 self.random_seq.append(generate_random_seq(center=amino_acid, wing_size=int(self.window_size * .5)))
+        if type(self.random_data) == str:
+            f = open(self.random_data)
+            key = [line for line in f]
+            self.random_seq = []
+            for i in range(int(ratio * len(self.features))):
+                s = generate_random_seq(center=amino_acid, wing_size=int(self.window_size * .5))
+                if s not in key:
+                    self.random_seq.append(s)
         self.features = list(map(self.vector, self.features))
         self.features = list(self.features)
 
@@ -492,7 +499,7 @@ class Predictor:
                 print("Reshuffling, no positive samples in either y_test or y_train ")
                 check += 1
         c = 0
-        if self.random_data == 1:
+        if self.random_data != -1:
             t = time.time()
             print("Random Sequences Generated", len(self.random_seq))
             print("Filtering Random Data")
