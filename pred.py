@@ -28,7 +28,8 @@ from gensim.models import word2vec
 from xgboost import XGBClassifier
 from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import BaggingClassifier
-from sklearn.cluster import KMeans
+from sklearn.svm import OneClassSVM
+from sklearn.ensemble import IsolationForest
 
 trash = ["\"", "B", "X", "Z", "U", "X"]
 
@@ -54,11 +55,11 @@ def report(results, answers):
                 fn += 1
 
     if tp != 0 and tn != 0:
-        tpr = tp / (tp + fn)  # aka recall aka true positive rate
+        sen = tp / (tp + fn)  # aka recall aka true positive rate
         spc = tn / (tn+fp)  # specificty or true negative rate
         acc = (tp + tn) / (tp + fp + tn + fn)
         roc = roc_auc_score(answers, results)
-        print("Sensitivity:", tpr)
+        print("Sensitivity:", sen)
         print("Specificity :", spc)
         print("Accuracy:", acc)
         print("ROC", roc)
@@ -414,7 +415,8 @@ class Predictor:
                                        "mlp_adam": MLPClassifier(),
                                        "svc": svm.SVC(verbose=1),
                                        "xgb": XGBClassifier(max_delta_step=5),
-                                       "bagging": BaggingClassifier()}
+                                       "bagging": BaggingClassifier(), "one_class_svm":OneClassSVM(kernel="rbf"),
+                                       "isolation_forest":IsolationForest()}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
@@ -492,14 +494,14 @@ class Predictor:
         check = 12
         while check != 0:
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
-                                                                                    test_size=0.2, random_state=check)
+                                                                                    test_size=(1-self.training_ratio), random_state=check)
             if 1 in self.y_test and 1 in self.y_train:
                 check = 0
             else:
                 print("Reshuffling, no positive samples in either y_test or y_train ")
                 check += 1
         c = 0
-        if self.random_data != -1:
+        if self.random_data > 1 or type(self.random_data) == str:
             t = time.time()
             print("Random Sequences Generated", len(self.random_seq))
             print("Filtering Random Data")
@@ -536,8 +538,7 @@ class Predictor:
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
         print(report(answers=self.y_test, results=self.test_results))
-        print("Cross: Validation:", cross_val_score(self.classifier, np.asarray(self.features),
-                                                    np.asarray(self.labels), cv=5))
+        print("Cross: Validation:", cross_val_score(self.classifier, np.asarray(self.features), np.asarray(self.labels), cv=5))
 
     def benchmark(self, benchmark: str, aa: str, scale = -1):
 
