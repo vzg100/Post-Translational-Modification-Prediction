@@ -94,7 +94,7 @@ def windower(sequence: str, position: int, wing_size: int):
     if (position + wing_size) > len(sequence):
         return sequence[position - wing_size:]
     else:
-        return sequence[position - wing_size:position + wing_size]
+        return sequence[position - wing_size:position + wing_size+1]
 
 
 def chemical_vector(temp_window: str):
@@ -110,13 +110,14 @@ def chemical_vector(temp_window: str):
 
 
 # noinspection PyDefaultArgument
-def sequence_vector(temp_window: str, seq_size: int = 21, chemical=1):
+def sequence_vector(temp_window: str, window: int = 6, chemical=1):
     """
     This vector takes the sequence and has each amino acid represented by an int
     0 represents nonstandard amino acids or as fluff for tails/heads of sequences
     Strip is a list which can be modified as user needs call for
     """
     temp_window = clean(temp_window)
+    temp_window = windower(sequence=temp_window, position=int(len(temp_window)*.5), wing_size=window)
 
     vec = []
     aa = {"G": 1, "A": 2, "L": 3, "M": 4, "F": 5, "W": 6, "K": 7, "Q": 8, "E": 9, "S": 10, "P": 11, "V": 12, "I": 13,
@@ -124,9 +125,9 @@ def sequence_vector(temp_window: str, seq_size: int = 21, chemical=1):
 
     for i in temp_window:
         vec.append(aa[i])
-    if len(vec) != seq_size:
+    if len(vec) != (window*2)+1:
         t = len(vec)
-        for i in range(seq_size-t):
+        for i in range((window*2)+1-t):
             vec.append(0)
     # Hydrophobicity is optional
     if chemical == 1:
@@ -323,17 +324,18 @@ class DataCleaner:
         for i in range(len(self.sequences)):
             file.write(str(self.sequences[i]) + "," + str(self.labels[i]) + "\n")
 
-    def generate_corpus(self, num_features: int=300, min_word_count: int=1, num_workers: int=4, downsampling=1e-3, context=10):
+    def generate_corpus(self, num_features: int=300, min_word_count: int=1, num_workers: int=4, downsampling=1e-3,
+                        context=10):
         self.words = []
         for i in self.protiens.keys():
             self.words.append(i.split())
         num_features = num_features  # Word vector dimensionality
         min_word_count = min_word_count  # Minimum word count
         num_workers = num_workers  # Number of threads to run in parallel
-        context =context  # Context window size
+        context = context  # Context window size
         downsampling = downsampling
         self.model = word2vec.Word2Vec(self.words, workers=num_workers, size=num_features, min_count = min_word_count,
-                                       window = context, sample = downsampling)
+                                       window=context, sample=downsampling)
         self.model.init_sims(replace=True)
 
 
@@ -405,7 +407,7 @@ class Predictor:
     The prototyping tool, meant to work with data outputted by datacleaner
 
     """
-    def __init__(self,  window_size=7, training_ratio=.7, seq="sequence", pos="label"):
+    def __init__(self,  window_size=6, training_ratio=.7, seq="sequence", pos="label"):
         self.training_ratio = training_ratio  # Float value representing % of data used for training
         self.features = []
         self.labels = []
@@ -415,7 +417,7 @@ class Predictor:
                                        "mlp_adam": MLPClassifier(),
                                        "svc": svm.SVC(verbose=1),
                                        "xgb": XGBClassifier(max_delta_step=5),
-                                       "bagging": BaggingClassifier(), "one_class_svm":OneClassSVM(kernel="rbf"),
+                                       "bagging": BaggingClassifier(), "one_class_svm": OneClassSVM(kernel="rbf"),
                                        "isolation_forest":IsolationForest()}
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
@@ -470,7 +472,10 @@ class Predictor:
                     self.random_seq.append(s)
         self.features = list(map(self.vector, self.features))
         self.features = list(self.features)
-
+        for i in self.features:
+            if len(i) != 16:
+                print(i)
+        print("Sample Vector", self.features[randint(0, len(self.features)-1)])
         temp = list(zip(self.features, self.labels))
         random.shuffle(temp)
         self.features, self.labels = zip(*temp)
@@ -493,8 +498,8 @@ class Predictor:
         self.scale = scale
         check = 12
         while check != 0:
-            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.features, self.labels,
-                                                                                    test_size=(1-self.training_ratio), random_state=check)
+            self.X_train, self.X_test, self.y_train, self.y_test = \
+                train_test_split(self.features, self.labels, test_size=test_size, random_state=check)
             if 1 in self.y_test and 1 in self.y_train:
                 check = 0
             else:
@@ -540,18 +545,16 @@ class Predictor:
         print(report(answers=self.y_test, results=self.test_results))
         print("Cross: Validation:", cross_val_score(self.classifier, np.asarray(self.features), np.asarray(self.labels), cv=5))
 
-    def benchmark(self, benchmark: str, aa: str, scale = -1):
-
+    def benchmark(self, benchmark: str, aa: str, window=13):
         benchmark = open(benchmark)
         validation = []
         answer_key = []
-
         for i in benchmark:
             s = i.split(",")
             label = s[1].replace("\n", "").replace("\t", "")
             seq = s[0].replace("\n", "").replace("\t", "")
             code = s[2].replace("\n", "").replace("\t", "")
-
+            seq = windower(sequence=seq, wing_size=self.window_size, position=int(len(seq) * .5))
             if aa == code:
                 validation.append(self.vector(seq))
                 answer_key.append(int(label))
