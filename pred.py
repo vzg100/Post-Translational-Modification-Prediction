@@ -543,7 +543,7 @@ class Predictor:
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
         print(report(answers=self.y_test, results=self.test_results))
-        print("Cross: Validation:", cross_val_score(self.classifier, np.asarray(self.features), np.asarray(self.labels), cv=5))
+        print("Cross Validation:", cross_val_score(self.classifier, np.asarray(self.features), np.asarray(self.labels), cv=5))
 
     def benchmark(self, benchmark: str, aa: str, window=13):
         benchmark = open(benchmark)
