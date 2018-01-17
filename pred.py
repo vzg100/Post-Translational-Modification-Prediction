@@ -1,3 +1,5 @@
+def warn(*args, **kwargs): #Mutes Sklearn warnings
+    pass
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
@@ -26,10 +28,13 @@ from sklearn.metrics import roc_auc_score
 import time
 from gensim.models import word2vec
 from xgboost import XGBClassifier
-from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import BaggingClassifier
 from sklearn.svm import OneClassSVM
-from sklearn.ensemble import IsolationForest
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import matthews_corrcoef
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import make_scorer
+
 
 trash = ["\"", "B", "X", "Z", "U", "X"]
 
@@ -39,8 +44,7 @@ def clean(seq: str, t: list = trash):
         seq = seq.replace(i, "")
     return seq
 
-
-def report(results, answers):
+def report(results, answers, verbose=0):
     tp, fp, fn, tn = 0, 0, 0, 0
     for i in range(len(results)):
         if results[i] == answers[i]:
@@ -53,8 +57,8 @@ def report(results, answers):
                 fp += 1
             else:
                 fn += 1
-
-    if tp != 0 and tn != 0:
+    mcc = matthews_corrcoef(answers, results)
+    if tp != 0 and tn != 0 and verbose != 0:
         sen = tp / (tp + fn)  # aka recall aka true positive rate
         spc = tn / (tn+fp)  # specificty or true negative rate
         acc = (tp + tn) / (tp + fp + tn + fn)
@@ -63,11 +67,14 @@ def report(results, answers):
         print("Specificity :", spc)
         print("Accuracy:", acc)
         print("ROC", roc)
+        print("Matthews Correlation Coeff: ", mcc)
         print("TP", tp, "FP", fp, "TN", tn, "FN", fn)
         print("\n\n")
 
+
     else:
-        print("Failed")
+
+        print("Matthews Correlation Coeff: ", mcc)
         print("TP", tp, "FP", fp, "TN", tn, "FN", fn)
         print("\n\n")
 
@@ -417,8 +424,9 @@ class Predictor:
                                        "mlp_adam": MLPClassifier(),
                                        "svc": svm.SVC(verbose=1),
                                        "xgb": XGBClassifier(max_delta_step=5),
-                                       "bagging": BaggingClassifier(), "one_class_svm": OneClassSVM(kernel="rbf"),
-                                       "isolation_forest":IsolationForest()}
+                                       "bagging": BaggingClassifier(), "one_class_svm": OneClassSVM(kernel="rbf")
+                                       }
+
         self.imbalance_functions = {"easy_ensemble": EasyEnsemble(), "SMOTEENN": SMOTEENN(),
                                     "SMOTETomek": SMOTETomek(), "ADASYN": ADASYN(),
                                     "random_under_sample": RandomUnderSampler(), "ncl": NeighbourhoodCleaningRule(),
@@ -430,7 +438,9 @@ class Predictor:
         self.vecs = {"sequence": sequence_vector, "chemical": chemical_vector, "binary": binary_vector, "w2v": "w2v"}
         self.vector = 0
         self.features_labels = {}
-
+        self.test_cv = 0
+        self.benchmark_mcc = 0
+        self.mcc_scorer = make_scorer(matthews_corrcoef)
     def load_data(self, file, delimit=",", header_line=0):
         """
         Reads the data for processing
@@ -486,7 +496,7 @@ class Predictor:
             print("Balanced Data")
         print("Finished working with Data")
 
-    def supervised_training(self, classy: str, scale: str =-1, break_point: int = 3200, test_size=.2):
+    def supervised_training(self, classy: str, scale: str =-1, break_point: int = 3200, test_size=.2, params={}):
         """
         Trains and tests the classifier on the data
         :param classy: Classifier of choice, is string passed through dict
@@ -494,7 +504,10 @@ class Predictor:
         :param break_point: how many seconds till negative random data samples will stop being generated
         :return: Classifier trained and ready to go and some results
         """
-        self.classifier = self.supervised_classifiers[classy]
+        if params == {}:
+            self.classifier = self.supervised_classifiers[classy]
+        else:
+            self.classifier = RandomizedSearchCV(self.supervised_classifiers[classy], param_distributions=params)
         self.scale = scale
         check = 12
         while check != 0:
@@ -538,12 +551,14 @@ class Predictor:
         print("Starting Training")
         self.X_train = np.asarray(self.X_train)
         self.y_train = np.asarray(self.y_train)
+
         self.classifier.fit(self.X_train, self.y_train)
         print("Done training")
         self.test_results = self.classifier.predict(self.X_test)
         print("Test Results")
         print(report(answers=self.y_test, results=self.test_results))
-        print("Cross Validation:", cross_val_score(self.classifier, np.asarray(self.features), np.asarray(self.labels), cv=5))
+        self.test_cv = cross_val_score(self.classifier, np.asarray(self.features), np.asarray(self.labels), cv=10, scoring=self.mcc_scorer).mean()
+        print("Cross Validation:",self.test_cv )
 
     def benchmark(self, benchmark: str, aa: str, window=13):
         benchmark = open(benchmark)
@@ -559,6 +574,7 @@ class Predictor:
                 validation.append(self.vector(seq))
                 answer_key.append(int(label))
         print("Number of data points in benchmark", len(validation))
+        print("Sample Vector", validation[0])
         validation = np.asarray(validation)
         if self.scale != -1:
             print("Scaling Data")
@@ -579,13 +595,13 @@ class Predictor:
                 print(i, "answer")
             if v[i] != 0 and v[i] != 1:
                 print(i, "V", v[i], type(v[i]))
+        self.benchmark_mcc = matthews_corrcoef(answer_key, v)
 
         print("Benchmark Results ")
         print(report(answers=answer_key, results=v))
 
     def generate_pca(self):
         """
-
         :return: PCA of data
         """
         y = np.arange(len(self.features))
