@@ -70,10 +70,7 @@ def report(results, answers, verbose=0):
         print("Matthews Correlation Coeff: ", mcc)
         print("TP", tp, "FP", fp, "TN", tn, "FN", fn)
         print("\n\n")
-
-
     else:
-
         print("Matthews Correlation Coeff: ", mcc)
         print("TP", tp, "FP", fp, "TN", tn, "FN", fn)
         print("\n\n")
